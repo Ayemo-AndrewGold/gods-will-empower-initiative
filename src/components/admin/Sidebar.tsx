@@ -25,7 +25,7 @@ export default function AdminSidebar() {
     { href: '/admin/customers', label: 'Customers', icon: FiUser },
     { href: '/admin/loans', label: 'Loans', icon: FiCreditCard },
     { href: '/admin/repayments', label: 'Repayments', icon: FiBarChart2 },
-    { href: '/admin/transaction', label: 'Transactions', icon: DollarSign },
+    { href: '/admin/reports', label: 'Reports', icon: DollarSign },
     { href: '/admin/setting', label: 'Settings', icon: FiSettings },
   ];
 

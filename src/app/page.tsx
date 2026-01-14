@@ -1,3 +1,4 @@
+"use client"; 
 import Image from "next/image";
 
 import Header from "@/components/Header"
@@ -17,3 +18,7 @@ export default function Home() {
     </div>
   );
 }
+
+// 69615f39a45f3c3744a44d9e
+
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NWZjY2I4ZGI4MzBlMjM1ZWE2NjFkMSIsInJvbGUiOiJBZG1pbiIsImlhdCI6MTc2Nzk4ODg4NiwiZXhwIjoxNzY4NTkzNjg2fQ.Ey_fn0TsMNZYYkohS9KddJvYs6urloYfVTMuNWnTVIk

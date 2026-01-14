@@ -45,12 +45,12 @@ export default function AdminLayout({
       <main 
         className={`${
           sidebarCollapsed ? 'ml-20' : 'ml-65'
-        } pt-16 p-6 min-h-screen transition-all duration-300 ease-in-out`}
+        } pt-16 p-3 min-h-screen transition-all duration-300 ease-in-out`}
       >
         {/* Content Container with Professional Styling */}
         <div className="max-w-[1600px] mx-auto">
           {/* Optional: Add a subtle content wrapper */}
-          <div className="bg-white/50 backdrop-blur-sm rounded-2xl shadow-sm p-6 min-h-[calc(100vh-7rem)]">
+          <div className="bg-white/50 backdrop-blur-sm rounded-2xl shadow-sm pt-3 min-h-[calc(100vh-7rem)]">
             {children}
           </div>
         </div>
