@@ -66,8 +66,8 @@ useEffect(() => {
          <div className="absolute inset-0 flex items-center">
         <div data-aos="zoom-in" className="container mx-auto px-4">
           {/* Content wrapper with professional background */}
-          <div className="max-w-xl backdrop-blur-lg bg-white/10 p-6 md:p-8 rounded-2xl border border-white/20 shadow-2xl">
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+          <div className="max-w-xl backdrop-blur-lg bg-white/10 p-6 md:p-8 rounded-2xl border border-white/20 shadow-2xl line-hight-normal">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight line-hight-normal">
               Gods Will <br /> Empowerment <br/> Initiative
               <span className="text-lg md:text-xl text-white/95 mb-8 leading-relaxed block">easy accessing...</span>
             </h1>    

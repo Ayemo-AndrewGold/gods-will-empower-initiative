@@ -1137,11 +1137,15 @@ useEffect(() => {
                   isDarkMode ? 'text-white' : 'text-gray-900'
                 }`}>Step 1: Select Customer</h3>
                 {customers.length === 0 ? (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                    <AlertCircle className={`w-12 h-12 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} mx-auto mb-2`} />
-                    <p className={`${isDarkMode ? 'text-yellow-800' : 'text-yellow-800'} font-medium`}>No approved customers available</p>
-                    <p className={`${isDarkMode ? 'text-yellow-800' : 'text-yellow-800'} font-medium`}>Please approve customers first before creating loans</p>
-                  </div>
+                 <div className={`border rounded-lg p-4 text-center ${
+                  isDarkMode ? 'bg-yellow-900/30 border-yellow-700' : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <AlertCircle className={`w-12 h-12 mx-auto mb-2 ${
+                    isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
+                  }`} />
+                  <p className="font-medium text-yellow-800">No approved customers available</p>
+                  <p className="font-medium text-yellow-800">Please approve customers first before creating loans</p>
+                </div>
                 ) : (
                   <div className={`${isDarkMode ? 'space-y-3' : 'space-y-3'}`}>
                     {/* Search Field */}
@@ -1153,7 +1157,11 @@ useEffect(() => {
                         value={customerSearchTerm}
                         onChange={(e) => setCustomerSearchTerm(e.target.value)}
                         disabled={submitting}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-sm"
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                          isDarkMode
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                       />
                     </div>
 
@@ -1188,12 +1196,14 @@ useEffect(() => {
 
               {selectedCustomer && (
                 <>
-                  <div className={`bg-blue-50 border border-blue-200 rounded-lg p-4 ${isDarkMode ? 'bg-blue-50 border border-blue-700' : 'bg-blue-50 border border-blue-200'}`}>
-                    <h4 className="font-semibold text-gray-900 mb-2">Customer Loan Product</h4>
+                  <div className={`rounded-lg p-4 border ${
+                    isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <h4 className="font-semibold mb-2">Customer Loan Product</h4>
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
-                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Product</p>
-                        <p className="font-bold text-gray-900">{selectedCustomer.preferredLoanProduct}</p>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Product</p>
+                      <p className="font-bold">{selectedCustomer.preferredLoanProduct}</p>
                       </div>
                       <div>
                         <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Interest Rate</p>
