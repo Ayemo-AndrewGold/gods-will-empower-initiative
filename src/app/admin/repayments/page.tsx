@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   CreditCard, Search, Plus, Download, Printer,
   ChevronLeft, ChevronRight, X, DollarSign, Calendar,
-  CheckCircle, AlertCircle, TrendingUp, Receipt, Loader2
+  CheckCircle, AlertCircle, TrendingUp, Receipt, Loader2,
+  History, User
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -42,66 +44,37 @@ const repaymentService = {
 const loanService = {
   getActiveLoans: async () => {
     const token = localStorage.getItem('token');
-    try {
-      // First try fetching all loans
-      const res = await fetch(`${API_URL}/loans`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Failed to fetch loans');
-      const response = await res.json();
-      
-      let allLoans = response.data || response;
-      
-      // Ensure it's an array
-      if (!Array.isArray(allLoans)) {
-        console.warn('Loans response is not an array:', allLoans);
-        allLoans = [];
-      }
-      
-      console.log('All loans received:', allLoans);
-      
-      // Log each loan's status for debugging
-      allLoans.forEach((loan: any, idx: number) => {
-        console.log(`Loan ${idx}:`, {
-          id: loan._id,
-          loanId: loan.loanId,
-          status: loan.status,
-          loanStatus: loan.loanStatus,
-          customer: loan.customer?.firstName || 'Unknown'
-        });
-      });
-      
-      // Filter for ONLY Active status (loans must be disbursed, not just approved)
-      const activeLoans = allLoans.filter((l: any) => {
-        const status = l.status || l.loanStatus || '';
-        const isActive = status === 'Active' || status.toLowerCase() === 'active';
-        return isActive;
-      });
-      
-      console.log('Total loans:', allLoans.length, 'Active loans:', activeLoans.length);
-      
-      return activeLoans;
-    } catch (error) {
-      console.error('Error fetching active loans:', error);
-      return [];
-    }
+    const res = await fetch(`${API_URL}/loans`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed to fetch loans');
+    const response = await res.json();
+    const allLoans = response.data || response;
+    return Array.isArray(allLoans) 
+      ? allLoans.filter((l: any) => 
+          l.status?.toLowerCase() === 'active' || 
+          l.status?.toLowerCase() === 'disbursed'
+        )
+      : [];
   }
 };
 
 export default function RepaymentsPage() {
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const [selectedLoanHistory, setSelectedLoanHistory] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLoan, setFilterLoan] = useState('all');
+  const [viewMode, setViewMode] = useState<'all' | 'grouped'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [repayments, setRepayments] = useState<any[]>([]);
   const [activeLoans, setActiveLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [lastPayment, setLastPayment] = useState<any>(null);
   const [loanSearchTerm, setLoanSearchTerm] = useState('');
-  const [showLoanDropdown, setShowLoanDropdown] = useState(false);
   
   const itemsPerPage = 10;
 
@@ -112,6 +85,19 @@ export default function RepaymentsPage() {
     paymentMethod: 'Cash',
     notes: ''
   });
+
+    // Sync with global dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const savedTheme = localStorage.getItem('theme');
+      const htmlHasDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(savedTheme === 'dark' || htmlHasDark);
+    };
+
+    checkDarkMode();
+    const interval = setInterval(checkDarkMode, 300);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -129,39 +115,7 @@ export default function RepaymentsPage() {
   const fetchRepayments = async () => {
     try {
       const data = await repaymentService.getAllRepayments();
-      let repaymentData = Array.isArray(data) ? data : [];
-
-      // Enrich repayments with loan and customer data if not already populated
-      repaymentData = await Promise.all(repaymentData.map(async (repayment: any) => {
-        // If loan data with customer is already populated, use it
-        if (repayment.loan?.customer) {
-          return repayment;
-        }
-
-        // Otherwise, fetch the loan data to get customer information
-        if (repayment.loan?._id || repayment.loan?.id) {
-          try {
-            const loanId = repayment.loan._id || repayment.loan.id;
-            const token = localStorage.getItem('token');
-            const loanRes = await fetch(`${API_URL}/loans/${loanId}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (loanRes.ok) {
-              const loanData = await loanRes.json();
-              const loanDetails = loanData.data || loanData;
-              return {
-                ...repayment,
-                loan: loanDetails
-              };
-            }
-          } catch (err) {
-            console.error('Error fetching loan details for repayment:', err);
-          }
-        }
-        return repayment;
-      }));
-
-      setRepayments(repaymentData);
+      setRepayments(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('Error fetching repayments:', err);
       setRepayments([]);
@@ -180,24 +134,93 @@ export default function RepaymentsPage() {
 
   const selectedLoan = activeLoans.find(l => l._id === formData.loanId);
 
+  // Safely get customer name from a repayment/loan object, with multiple fallbacks
+  const getCustomerNameFromLoan = (loan: any) => {
+    if (!loan) return '';
+
+    const customer = loan.customer || loan.borrower || loan.client;
+    if (!customer && (loan.customerName || loan.borrowerName || loan.clientName)) {
+      return loan.customerName || loan.borrowerName || loan.clientName;
+    }
+
+    if (!customer) return '';
+
+    const firstName = customer.firstName || customer.firstname || '';
+    const lastName = customer.lastName || customer.lastname || '';
+    const combined = `${firstName} ${lastName}`.trim();
+
+    if (combined) return combined;
+
+    return (
+      customer.name ||
+      customer.fullName ||
+      loan.customerName ||
+      loan.borrowerName ||
+      loan.clientName ||
+      ''
+    );
+  };
+
+  const getCustomerNameFromPayment = (payment: any) => {
+    if (!payment) return '';
+
+    // If backend populates the `customer` field directly on repayment
+    let fromCustomer = '';
+    if (payment.customer && typeof payment.customer === 'object') {
+      fromCustomer = getCustomerNameFromLoan({ customer: payment.customer });
+    }
+
+    return (
+      fromCustomer ||
+      getCustomerNameFromLoan(payment.loan) ||
+      payment.customerName ||
+      payment.customerFullName ||
+      ''
+    );
+  };
+
+  // Helpers for loan repayment status and balances
+  const getLoanTotalPaid = (loan: any) => {
+    if (!loan) return 0;
+    return loan.totalPaid ?? loan.amountPaid ?? 0;
+  };
+
+  const getLoanRemainingBalance = (loan: any) => {
+    if (!loan) return 0;
+    return (
+      loan.remainingBalance ??
+      loan.outstandingBalance ??
+      loan.balance ??
+      0
+    );
+  };
+
+  const hasLoanStartedPaying = (loan: any) => {
+    return getLoanTotalPaid(loan) > 0;
+  };
+
   const calculatePaymentAllocation = () => {
     if (!formData.paymentAmount || !selectedLoan) return null;
 
     const paymentAmount = parseFloat(formData.paymentAmount);
-    const outstandingBalance = selectedLoan.outstandingBalance || selectedLoan.remainingBalance || 0;
-    const amountPaid = selectedLoan.amountPaid || 0;
+    const totalPayable = selectedLoan.totalPayable || selectedLoan.totalAmount || 0;
+    const totalPaid = getLoanTotalPaid(selectedLoan);
     const interestAmount = selectedLoan.interestAmount || 0;
-    const principal = selectedLoan.principalAmount || selectedLoan.principal || 0;
+    const principalAmount = selectedLoan.principalAmount || selectedLoan.principal || 0;
+    
+    // Calculate what's already been paid (interest first, then principal)
+    const interestPaidSoFar = selectedLoan.interestPaid || Math.min(totalPaid, interestAmount);
+    const principalPaidSoFar = selectedLoan.principalPaid || Math.max(0, totalPaid - interestAmount);
+    
+    // Calculate remaining amounts
+    const remainingInterest = Math.max(0, interestAmount - interestPaidSoFar);
+    const remainingPrincipal = Math.max(0, principalAmount - principalPaidSoFar);
+    const outstandingBalance = totalPayable - totalPaid;
 
-    const interestPaid = Math.min(amountPaid, interestAmount);
-    const principalPaid = Math.max(0, amountPaid - interestAmount);
-    const remainingInterest = Math.max(0, interestAmount - interestPaid);
-    const remainingPrincipal = Math.max(0, principal - principalPaid);
-
+    // Allocate payment: interest first, then principal
     let interestPortion = 0;
     let principalPortion = 0;
 
-    // Interest is cleared first
     if (remainingInterest > 0) {
       interestPortion = Math.min(paymentAmount, remainingInterest);
       principalPortion = Math.min(paymentAmount - interestPortion, remainingPrincipal);
@@ -205,11 +228,20 @@ export default function RepaymentsPage() {
       principalPortion = Math.min(paymentAmount, remainingPrincipal);
     }
 
+    // Calculate new balances after this payment
+    const newTotalPaid = totalPaid + paymentAmount;
+    const newInterestPaid = interestPaidSoFar + interestPortion;
+    const newPrincipalPaid = principalPaidSoFar + principalPortion;
+    const newRemainingBalance = Math.max(0, totalPayable - newTotalPaid);
+
     return {
       paymentAmount: interestPortion + principalPortion,
       interestPortion,
       principalPortion,
-      newRemainingBalance: Math.max(0, outstandingBalance - (interestPortion + principalPortion)),
+      newRemainingBalance,
+      newTotalPaid,
+      newInterestPaid,
+      newPrincipalPaid,
       remainingInterest: Math.max(0, remainingInterest - interestPortion),
       remainingPrincipal: Math.max(0, remainingPrincipal - principalPortion)
     };
@@ -219,61 +251,15 @@ export default function RepaymentsPage() {
 
   const handleInputChange = (e: any) => {
     const { name, value } = e.target;
-    if (name === 'loanId') {
-      setFormData(prev => ({ ...prev, loanId: value, paymentAmount: '' }));
-      // Fetch last payment for the selected loan
-      fetchLastPayment(value);
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
-  };
-
-  const fetchLastPayment = async (loanId: string) => {
-    if (!loanId) {
-      setLastPayment(null);
-      return;
-    }
-    try {
-      const token = localStorage.getItem('token');
-      // Find the last payment from the repayments list for this loan
-      const loanRepayments = repayments.filter((r: any) => r.loan?._id === loanId);
-      if (loanRepayments.length > 0) {
-        // Sort by date (most recent first) and get the latest one
-        const sortedPayments = loanRepayments.sort((a: any, b: any) => 
-          new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-        );
-        setLastPayment(sortedPayments[0]);
-      } else {
-        setLastPayment(null);
-      }
-    } catch (err) {
-      console.error('Error fetching last payment:', err);
-      setLastPayment(null);
-    }
-  };
-
-  // Get filtered loans based on search term
-  const filteredActiveLoans = activeLoans.filter((loan: any) => {
-    const searchLower = loanSearchTerm.toLowerCase();
-    const customerName = `${loan.customer?.firstName || ''} ${loan.customer?.lastName || ''}`.toLowerCase();
-    const phone = (loan.customer?.phoneNumber || '').toLowerCase();
-    const loanId = (loan.loanId || '').toLowerCase();
-    
-    return customerName.includes(searchLower) || 
-           phone.includes(searchLower) || 
-           loanId.includes(searchLower);
-  });
-
-  // Check if a loan has payment history
-  const getLoanPaymentStatus = (loanId: string) => {
-    return repayments.some((r: any) => r.loan?._id === loanId);
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'loanId') setFormData(prev => ({ ...prev, paymentAmount: '' }));
   };
 
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
       if (!formData.loanId || !formData.paymentAmount || !formData.paymentDate) {
-        alert('Please fill in all required fields');
+        toast.error('Please fill in all required fields');
         return;
       }
 
@@ -281,27 +267,32 @@ export default function RepaymentsPage() {
       const outstandingBalance = selectedLoan?.outstandingBalance || selectedLoan?.remainingBalance || 0;
       
       if (!allocation || allocation.paymentAmount > outstandingBalance) {
-        alert('Invalid payment amount. Cannot exceed outstanding balance.');
+        toast.error('Invalid payment amount. Cannot exceed outstanding balance.');
         return;
       }
 
       const repaymentData = {
         loan: formData.loanId,
         paymentAmount: allocation.paymentAmount,
+        interestPortion: allocation.interestPortion,
+        principalPortion: allocation.principalPortion,
         paymentMethod: formData.paymentMethod,
         transactionReference: '',
         notes: formData.notes
       };
 
       const result = await repaymentService.recordRepayment(repaymentData);
+      
+      // Refresh data to show updated balances
       await fetchData();
+      
       setShowRecordModal(false);
       setSelectedReceipt(result.data || result);
       setShowReceiptModal(true);
       resetForm();
-      alert('✅ Payment recorded successfully!');
+      toast.success('? Payment recorded successfully! Loan balance has been updated.');
     } catch (err: any) {
-      alert('❌ ' + err.message);
+      toast.error('? ' + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -315,9 +306,7 @@ export default function RepaymentsPage() {
       paymentMethod: 'Cash',
       notes: ''
     });
-    setLastPayment(null);
     setLoanSearchTerm('');
-    setShowLoanDropdown(false);
   };
 
   const formatCurrency = (amount: number) => {
@@ -329,13 +318,16 @@ export default function RepaymentsPage() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Payment ID', 'Loan ID', 'Customer', 'Amount', 'Date', 'Method'];
+    const headers = ['Payment ID', 'Loan ID', 'Customer', 'Amount', 'Interest', 'Principal', 'Balance After', 'Date', 'Method'];
     const rows = filteredRepayments.map((r: any) => [
       r.repaymentId || r._id,
       r.loan?.loanId,
-      `${r.loan?.customer?.firstName} ${r.loan?.customer?.lastName}`,
+      getCustomerNameFromPayment(r),
       r.paymentAmount,
-      r.paymentDate,
+      r.interestPortion || 0,
+      r.principalPortion || 0,
+      r.remainingBalance || 0,
+      new Date(r.paymentDate).toLocaleDateString(),
       r.paymentMethod
     ]);
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
@@ -372,7 +364,7 @@ export default function RepaymentsPage() {
               <h1>PAYMENT RECEIPT</h1>
               <p>Receipt ID: ${selectedReceipt.repaymentId || selectedReceipt._id}</p>
             </div>
-            <div class="row"><span class="label">Customer:</span> <span>${selectedReceipt.loan?.customer?.firstName} ${selectedReceipt.loan?.customer?.lastName}</span></div>
+            <div class="row"><span class="label">Customer:</span> <span>${getCustomerNameFromPayment(selectedReceipt)}</span></div>
             <div class="row"><span class="label">Loan ID:</span> <span>${selectedReceipt.loan?.loanId}</span></div>
             <div class="row"><span class="label">Payment Date:</span> <span>${new Date(selectedReceipt.paymentDate).toLocaleDateString()}</span></div>
             <div class="row"><span class="label">Payment Method:</span> <span>${selectedReceipt.paymentMethod}</span></div>
@@ -395,182 +387,432 @@ export default function RepaymentsPage() {
     printWindow.print();
   };
 
+  const viewPaymentHistory = (loanId: string) => {
+    const loanPayments = repayments
+      .filter((r: any) => r.loan?._id === loanId)
+      .sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+    
+    const loan = repayments.find((r: any) => r.loan?._id === loanId)?.loan;
+    
+    setSelectedLoanHistory({
+      loan,
+      payments: loanPayments
+    });
+    setShowPaymentHistory(true);
+  };
+
   const filteredRepayments = repayments.filter((payment: any) => {
-    const customerName = payment.loan?.customer 
-      ? `${payment.loan.customer.firstName} ${payment.loan.customer.lastName}`.toLowerCase()
-      : '';
+    const customerName = getCustomerNameFromPayment(payment).toLowerCase();
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = customerName.includes(searchLower) ||
-                         (payment.repaymentId || '').toLowerCase().includes(searchLower) ||
-                         (payment.loan?.loanId || '').toLowerCase().includes(searchLower);
+    const matchesSearch =
+      customerName.includes(searchLower) ||
+      (payment.repaymentId || '').toLowerCase().includes(searchLower) ||
+      (payment.loan?.loanId || '').toLowerCase().includes(searchLower);
     const matchesLoan = filterLoan === 'all' || payment.loan?._id === filterLoan;
     return matchesSearch && matchesLoan;
   });
 
-  const totalPages = Math.ceil(filteredRepayments.length / itemsPerPage);
+  // Group repayments by loan for grouped view
+  const groupedRepayments = filteredRepayments.reduce((acc: any, payment: any) => {
+    const loanId = payment.loan?._id;
+    if (!loanId) return acc;
+    
+    if (!acc[loanId]) {
+      acc[loanId] = {
+        loan: payment.loan,
+        payments: [],
+        totalPaid: 0,
+        paymentCount: 0,
+        lastPaymentDate: null
+      };
+    }
+    
+    acc[loanId].payments.push(payment);
+    acc[loanId].totalPaid += payment.paymentAmount || 0;
+    acc[loanId].paymentCount += 1;
+    
+    const paymentDate = new Date(payment.paymentDate);
+    if (!acc[loanId].lastPaymentDate || paymentDate > acc[loanId].lastPaymentDate) {
+      acc[loanId].lastPaymentDate = paymentDate;
+    }
+    
+    return acc;
+  }, {});
+
+  const groupedData = Object.values(groupedRepayments);
+
+  const displayData = viewMode === 'grouped' ? groupedData : filteredRepayments;
+  const totalPages = Math.ceil(displayData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentRepayments = filteredRepayments.slice(startIndex, endIndex);
+  const currentItems = displayData.slice(startIndex, endIndex);
+
+  // Get filtered loans
+  const filteredActiveLoans = activeLoans.filter((loan: any) => {
+    const searchLower = loanSearchTerm.toLowerCase();
+    const customerName = `${loan.customer?.firstName || ''} ${loan.customer?.lastName || ''}`.toLowerCase();
+    const phone = (loan.customer?.phoneNumber || '').toLowerCase();
+    const loanId = (loan.loanId || '').toLowerCase();
+    
+    return customerName.includes(searchLower) || phone.includes(searchLower) || loanId.includes(searchLower);
+  });
 
   const stats = {
     totalRepayments: repayments.length,
     totalCollected: repayments.reduce((sum: number, r: any) => sum + (r.paymentAmount || 0), 0),
-    todayCollections: repayments.filter((r: any) => 
-      r.paymentDate === new Date().toISOString().split('T')[0]
-    ).length,
-    activeLoansCount: activeLoans.length
+    todayCollections: repayments.filter((r: any) => {
+      const paymentDate = r.paymentDate ? new Date(r.paymentDate).toISOString().split('T')[0] : '';
+      const today = new Date().toISOString().split('T')[0];
+      return paymentDate === today;
+    }).reduce((sum: number, r: any) => sum + (r.paymentAmount || 0), 0),
+    activeLoansCount: activeLoans.length,
+    uniqueCustomers: new Set(repayments.map((r: any) => r.loan?.customer?._id).filter(Boolean)).size
   };
 
-  if (loading) {
+ if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className={`flex items-center justify-center h-screen ${
+        isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-orange-50 via-white to-blue-50'
+      }`}>
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-green-600 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading repayments...</p>
+          <Loader2 className={`w-12 h-12 animate-spin mx-auto mb-4 ${
+            isDarkMode ? 'text-orange-500' : 'text-green-600'
+          }`} />
+          <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-600'}`}>
+            Loading repayments...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Repayment Management</h1>
-            <p className="text-gray-600">Record and track loan repayments</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={exportToCSV} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2 transition-colors">
-              <Download className="w-4 h-4" />Export
-            </button>
-            <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2 transition-colors">
-              <Printer className="w-4 h-4" />Print
-            </button>
-            <button onClick={() => setShowRecordModal(true)} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 shadow-md transition-colors">
-              <Plus className="w-5 h-5" />Record Payment
-            </button>
+    <div className={`min-h-screen px-1 transition-colors duration-200 ${
+      isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-orange-50 via-white to-blue-50'
+    }`}>
+            {/* Header */}
+      <div className={`border-b ${
+        isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
+        <div className="px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                Repayment Management
+              </h1>
+              <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Record and track loan repayments
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={exportToCSV}
+                className={`px-4 py-2.5 border rounded-xl transition-colors flex items-center gap-2 ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' 
+                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <Download className={`w-4 h-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`} />
+                <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Export
+                </span>
+              </button>
+              <button 
+                onClick={() => window.print()}
+                className={`px-4 py-2.5 border rounded-xl transition-colors flex items-center gap-2 ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' 
+                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <Printer className={`w-4 h-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`} />
+                <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Print
+                </span>
+              </button>
+              <button 
+                onClick={() => setShowRecordModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 shadow-md transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Record Payment
+              </button>
+            </div>
           </div>
         </div>
       </div>
-
+      
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Repayments</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalRepayments}</p>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6 mb-6">
+          <div className={`rounded-2xl p-6 border shadow-sm ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Total Transactions
+                </p>
+                <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {stats.totalRepayments}
+                </p>
+                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                  {stats.uniqueCustomers} customers
+                </p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <CreditCard className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <CreditCard className="w-6 h-6 text-blue-600" />
+          </div>
+
+          <div className={`rounded-2xl p-6 border shadow-sm ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Total Collected
+                </p>
+                <p className={`text-2xl font-bold pt-2 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                  {formatCurrency(stats.totalCollected)}
+                </p>
+              </div>
+              {/* <div className="p-1 bg-green-100 rounded-sm">
+                <DollarSign className="w-3 h-3 text-green-600" />
+              </div> */}
+            </div>
+          </div>
+
+          <div className={`rounded-2xl p-6 border shadow-sm ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Today's Collections
+                </p>
+                <p className={`text-2xl font-bold ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                  {formatCurrency(stats.todayCollections)}
+                </p>
+              </div>
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <Calendar className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className={`rounded-2xl p-6 border shadow-sm ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Active Loans
+                </p>
+                <p className={`text-3xl font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
+                  {stats.activeLoansCount}
+                </p>
+              </div>
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-orange-600" />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Collected</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalCollected)}</p>
+        {/* Search and Filter */}
+        <div className={`rounded-2xl border p-4 mb-6 shadow-sm ${
+          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className={`w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                isDarkMode ? 'text-gray-500' : 'text-gray-400'
+              }`} />
+              <input
+                type="text"
+                placeholder="Search by customer name, payment ID, or loan ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`w-full pl-10 pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300'
+                }`}
+              />
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <DollarSign className="w-6 h-6 text-green-600" />
+            <select 
+              value={filterLoan} 
+              onChange={(e) => setFilterLoan(e.target.value)}
+              className={`px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300'
+              }`}
+            >
+              <option value="all">All Loans</option>
+              {activeLoans.map((loan: any) => (
+                <option key={loan._id} value={loan._id}>
+                  {loan.loanId} - {loan.customer?.firstName} {loan.customer?.lastName}
+                </option>
+              ))}
+            </select>
+            <div className={`flex gap-2 border rounded-xl p-1 ${
+              isDarkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-gray-50'
+            }`}>
+              <button
+                onClick={() => { setViewMode('all'); setCurrentPage(1); }}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'all' 
+                    ? isDarkMode 
+                      ? 'bg-gray-600 text-white shadow-sm' 
+                      : 'bg-white text-gray-900 shadow-sm'
+                    : isDarkMode
+                      ? 'text-gray-300 hover:text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All Payments
+              </button>
+              <button
+                onClick={() => { setViewMode('grouped'); setCurrentPage(1); }}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'grouped' 
+                    ? isDarkMode 
+                      ? 'bg-gray-600 text-white shadow-sm' 
+                      : 'bg-white text-gray-900 shadow-sm'
+                    : isDarkMode
+                      ? 'text-gray-300 hover:text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                By Customer
+              </button>
             </div>
           </div>
         </div>
-
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Today's Collections</p>
-              <p className="text-3xl font-bold text-purple-600">{stats.todayCollections}</p>
-            </div>
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Calendar className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Active Loans</p>
-              <p className="text-3xl font-bold text-orange-600">{stats.activeLoansCount}</p>
-            </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by customer name, payment ID, or loan ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-          <select value={filterLoan} onChange={(e) => setFilterLoan(e.target.value)} className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
-            <option value="all">All Loans</option>
-            {activeLoans.map((loan: any) => (
-              <option key={loan._id} value={loan._id}>{loan.loanId} - {loan.customer?.firstName} {loan.customer?.lastName}</option>
-            ))}
-          </select>
-        </div>
-      </div>
 
       {/* Repayments Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Payment ID</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Loan ID</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Customer</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Amount Paid</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Interest</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Principal</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Balance</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Method</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
+        <div className={`rounded-2xl border overflow-hidden shadow-sm ${
+          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className={`border-b ${
+                isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <tr>
+                  {viewMode === 'all' ? (
+                    <>
+                      <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Payment ID</th>
+                      <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Loan ID</th>
+                      <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Customer</th>
+                      <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Amount Paid</th>
+                      <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Interest</th>
+                      <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Principal</th>
+                      <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Balance After</th>
+                      <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Date</th>
+                    <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Method</th>
+                    <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Actions</th>
+                  </>
+                ) : (
+                  <>
+                    <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Loan ID</th>
+                    <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Customer</th>
+                    <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Payments</th>
+                    <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Total Paid</th>
+                    <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Current Balance</th>
+                    <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Last Payment</th>
+                    <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                      }`}>Actions</th>
+                  </>
+                )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {currentRepayments.length === 0 ? (
+            <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+              {currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-16 text-center">
-                    <CreditCard className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg mb-2">No repayments found</p>
-                    <p className="text-gray-400 text-sm">{repayments.length === 0 ? 'Click "Record Payment" to start' : 'Try adjusting your search'}</p>
+                  <td colSpan={viewMode === 'all' ? 10 : 7} className="px-6 py-16 text-center">
+                    <CreditCard className={`w-16 h-16 mx-auto mb-4 ${
+                        isDarkMode ? 'text-gray-600' : 'text-gray-300'
+                      }`} />
+                    <p className={`text-lg mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No repayments found</p>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{repayments.length === 0 ? 'Click "Record Payment" to start' : 'Try adjusting your search'}</p>
                   </td>
                 </tr>
-              ) : (
-                currentRepayments.map((payment: any) => (
-                  <tr key={payment._id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4"><span className="text-sm font-semibold text-green-600">{payment.repaymentId || payment._id}</span></td>
-                    <td className="px-6 py-4"><span className="text-sm font-semibold text-blue-600">{payment.loan?.loanId}</span></td>
+              ) : viewMode === 'all' ? (
+                currentItems.map((payment: any) => (
+                  <tr key={payment._id} className={`transition-colors ${
+                      isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                    }`}>
+                    <td className="px-6 py-4"><span className={`text-sm font-semibold ${
+                          isDarkMode ? 'text-green-400' : 'text-green-600'
+                        }`}>{payment.repaymentId || payment._id.slice(-6)}</span></td>
+                    <td className="px-6 py-4"><span className={`text-sm font-semibold ${
+                          isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                        }`}>{payment.loan?.loanId}</span></td>
                     <td className="px-6 py-4">
                       <div>
-                        <span className="text-sm font-medium text-gray-900">{payment.loan?.customer?.firstName} {payment.loan?.customer?.lastName}</span>
-                        <p className="text-xs text-gray-500">{payment.loan?.loanProduct}</p>
+                        <span className={`text-sm font-medium ${
+                            isDarkMode ? 'text-white' : 'text-gray-900'
+                          }`}>
+                          {getCustomerNameFromPayment(payment) || 'Unknown Customer'}
+                        </span>
+                        <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>{payment.loan?.loanProduct}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4"><span className="text-sm font-bold text-green-600">{formatCurrency(payment.paymentAmount)}</span></td>
-                    <td className="px-6 py-4"><span className="text-sm font-semibold text-orange-600">{formatCurrency(payment.interestPortion || 0)}</span></td>
-                    <td className="px-6 py-4"><span className="text-sm font-semibold text-blue-600">{formatCurrency(payment.principalPortion || 0)}</span></td>
-                    <td className="px-6 py-4"><span className="text-sm font-semibold text-gray-900">{formatCurrency(payment.remainingBalance || 0)}</span></td>
-                    <td className="px-6 py-4"><span className="text-sm text-gray-600">{new Date(payment.paymentDate).toLocaleDateString()}</span></td>
-                    <td className="px-6 py-4"><span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold">{payment.paymentMethod}</span></td>
+                    <td className="px-6 py-4"><span className={`text-sm font-bold ${
+                          isDarkMode ? 'text-green-400' : 'text-green-600'
+                        }`}>{formatCurrency(payment.paymentAmount)}</span></td>
+                    <td className="px-6 py-4"><span className={`text-sm font-semibold ${
+                          isDarkMode ? 'text-orange-400' : 'text-orange-600'
+                        }`}>{formatCurrency(payment.interestPortion || 0)}</span></td>
+                    <td className="px-6 py-4"><span className={`text-sm font-semibold ${
+                          isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                        }`}>{formatCurrency(payment.principalPortion || 0)}</span></td>
+                    <td className="px-6 py-4"><span className={`text-sm font-semibold ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-900'
+                        }`}>{formatCurrency(payment.remainingBalance || 0)}</span></td>
+                    <td className="px-6 py-4"><span className={`text-sm ${
+                          isDarkMode ? 'text-gray-500' : 'text-gray-600'
+                        }`}>{new Date(payment.paymentDate).toLocaleDateString()}</span></td>
+                    <td className="px-6 py-4"><span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                          isDarkMode ? 'bg-blue-800 text-blue-200' : 'bg-blue-100 text-blue-700'
+                        }`}>{payment.paymentMethod}</span></td>
                     <td className="px-6 py-4">
                       <button onClick={() => { setSelectedReceipt(payment); setShowReceiptModal(true); }} className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="View Receipt">
                         <Receipt className="w-4 h-4" />
@@ -578,22 +820,103 @@ export default function RepaymentsPage() {
                     </td>
                   </tr>
                 ))
+              ) : (
+                currentItems.map((group: any) => {
+                  const firstPayment = group.payments && group.payments[0];
+                  const customerName = firstPayment ? getCustomerNameFromPayment(firstPayment) : '';
+
+                  return (
+                    <tr key={group.loan?._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className={`text-sm font-semibold ${
+                            isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                          }`}>
+                          {group.loan?.loanId}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <User className={`w-4 h-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                          <div>
+                            <span className={`text-sm font-medium ${
+                                isDarkMode ? 'text-white' : 'text-gray-900'
+                              }`}>
+                              {customerName || 'Unknown Customer'}
+                            </span>
+                            <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>{group.loan?.loanProduct}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-sm font-bold ${
+                            isDarkMode ? 'text-purple-400' : 'text-purple-600'
+                          }`}>
+                          {group.paymentCount} payment{group.paymentCount !== 1 ? 's' : ''}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-sm font-bold ${
+                            isDarkMode ? 'text-green-400' : 'text-green-600'
+                          }`}>
+                          {formatCurrency(group.totalPaid)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-sm font-semibold ${
+                            isDarkMode ? 'text-orange-400' : 'text-orange-600'
+                          }`}>
+                          {formatCurrency(group.payments[0]?.remainingBalance || 0)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {group.lastPaymentDate?.toLocaleDateString()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => viewPaymentHistory(group.loan?._id)}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                              isDarkMode 
+                                ? 'text-blue-400 bg-blue-900/30 hover:bg-blue-900/50' 
+                                : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                            }`}
+                        >
+                          <History className="w-3.5 h-3.5" />
+                          View History
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {filteredRepayments.length > 0 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+        {displayData.length > 0 && (
+          <div className={`px-6 py-4 border-t flex items-center justify-between ${
+              isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+            }`}>
             <div className="text-sm text-gray-600">
-              Showing <span className="font-semibold">{startIndex + 1}</span> to <span className="font-semibold">{Math.min(endIndex, filteredRepayments.length)}</span> of <span className="font-semibold">{filteredRepayments.length}</span> repayments
+              Showing <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{startIndex + 1}</span> to <span className="font-semibold">{Math.min(endIndex, displayData.length)}</span> of <span className="font-semibold">{displayData.length}</span> {viewMode === 'all' ? 'payments' : 'customers'}
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-2 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className={`p-2 border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDarkMode 
+                      ? 'border-gray-600 hover:bg-gray-700' 
+                      : 'border-gray-300 hover:bg-white'
+                  }`}>
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <span className="px-4 py-2 text-sm font-medium">Page {currentPage} of {totalPages}</span>
-              <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-2 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              <span className={`px-4 py-2 text-sm font-medium ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>Page {currentPage} of {totalPages}</span>
+              <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className={`p-2 border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDarkMode 
+                      ? 'border-gray-600 hover:bg-gray-700' 
+                      : 'border-gray-300 hover:bg-white'
+                  }`}>
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
@@ -604,130 +927,138 @@ export default function RepaymentsPage() {
       {/* Record Payment Modal */}
       {showRecordModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+          <div className={`rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto ${
+            isDarkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            <div className={`sticky top-0 border-b px-6 py-4 flex items-center justify-between z-10 ${
+              isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Record Repayment</h2>
-                <p className="text-sm text-gray-600 mt-1">Select loan and enter payment details</p>
+                <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Record Repayment</h2>
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Select loan and enter payment details</p>
               </div>
-              <button onClick={() => { setShowRecordModal(false); resetForm(); }} disabled={submitting} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={() => { setShowRecordModal(false); resetForm(); }} disabled={submitting} className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                }`}>
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Step 1: Select Active Loan</h3>
+                <h3 className={`text-lg font-semibold mb-4 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>Step 1: Select Active Loan</h3>
                 {activeLoans.length === 0 ? (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                    <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-2" />
-                    <p className="text-yellow-800 font-medium">No active loans available</p>
-                    <p className="text-yellow-700 text-sm mt-1"><strong>Workflow:</strong> Approve loan → Then click <strong>Disburse</strong> button to make it Active → Then you can record repayments</p>
+                  <div className={`border rounded-xl p-4 text-center ${
+                    isDarkMode 
+                      ? 'bg-yellow-900/20 border-yellow-800' 
+                      : 'bg-yellow-50 border-yellow-200'
+                  }`}>
+                    <AlertCircle className={`w-12 h-12 mx-auto mb-2 ${
+                      isDarkMode ? 'text-yellow-500' : 'text-yellow-600'
+                    }`} />
+                    <p className={`font-medium ${
+                      isDarkMode ? 'text-yellow-400' : 'text-yellow-800'
+                    }`}>No active loans available</p>
+                    <p className={`text-sm mt-1 ${
+                      isDarkMode ? 'text-yellow-500' : 'text-yellow-700'
+                    }`}>Approve loan ? Click Disburse ? Then record repayments</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* Search Field */}
                     <div className="relative">
-                      <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                      <Search className={`w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                        isDarkMode ? 'text-gray-500' : 'text-gray-400'
+                      }`} />
                       <input
                         type="text"
                         placeholder="Search by name, phone, or loan ID..."
                         value={loanSearchTerm}
                         onChange={(e) => setLoanSearchTerm(e.target.value)}
                         disabled={submitting}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 text-sm"
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 text-sm ${
+                          isDarkMode 
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                            : 'bg-white border-gray-300'
+                        }`}
                       />
                     </div>
-
-                    {/* Dropdown with filtered options */}
-                    <select 
-                      name="loanId" 
-                      value={formData.loanId} 
-                      onChange={handleInputChange} 
-                      disabled={submitting} 
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+                    <select
+                      name="loanId"
+                      value={formData.loanId}
+                      onChange={handleInputChange}
+                      disabled={submitting}
+                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 ${
+                        isDarkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white' 
+                          : 'bg-white border-gray-300'
+                      }`}
                     >
                       <option value="">Choose a loan...</option>
                       {filteredActiveLoans.map((loan: any) => {
-                        const hasPayment = getLoanPaymentStatus(loan._id);
-                        const paymentIndicator = hasPayment ? '🟢' : '⚪';
+                        const totalPaid = getLoanTotalPaid(loan);
+                        const remaining = getLoanRemainingBalance(loan);
+                        const started = hasLoanStartedPaying(loan);
+                        const statusLabel = started ? '🟢 Paying' : '⚪ Not started';
                         return (
                           <option key={loan._id} value={loan._id}>
-                            {paymentIndicator} {loan.loanId} - {loan.customer?.firstName} {loan.customer?.lastName} | {loan.customer?.phoneNumber} | {loan.loanProduct} | Balance: {formatCurrency(loan.outstandingBalance || loan.remainingBalance || 0)}
+                            {statusLabel} {loan.loanId} - {loan.customer?.firstName} {loan.customer?.lastName} |{' '}
+                            {loan.customer?.phoneNumber} | Paid: {formatCurrency(totalPaid)} | Balance:{' '}
+                            {formatCurrency(remaining)}
                           </option>
                         );
                       })}
                     </select>
-
-                    {/* Results count */}
-                    <p className="text-xs text-gray-600">
-                      Showing {filteredActiveLoans.length} of {activeLoans.length} loans
-                      {loanSearchTerm && ` (Filtered by "${loanSearchTerm}")`}
-                    </p>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>Showing {filteredActiveLoans.length} of {activeLoans.length} loans</p>
                   </div>
                 )}
               </div>
 
               {selectedLoan && (
                 <>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">Loan Details</h4>
+                  <div className={`rounded-xl p-4 border ${
+                    isDarkMode 
+                      ? 'bg-blue-900/20 border-blue-800' 
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <h4 className={`font-semibold mb-3 ${
+                      isDarkMode ? 'text-white' : 'text-gray-900'
+                    }`}>Loan Details</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-gray-600">Total Payable</p>
-                        <p className="font-bold text-gray-900">{formatCurrency(selectedLoan.totalPayable || selectedLoan.totalAmount || 0)}</p>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Total Payable</p>
+                        <p className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(selectedLoan.totalPayable || selectedLoan.totalAmount || 0)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Amount Paid</p>
-                        <p className="font-bold text-green-600">{formatCurrency(selectedLoan.amountPaid || 0)}</p>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Amount Paid</p>
+                        <p className={`font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                          {formatCurrency(getLoanTotalPaid(selectedLoan))}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Remaining Balance</p>
-                        <p className="font-bold text-orange-600">{formatCurrency(selectedLoan.outstandingBalance || selectedLoan.remainingBalance || 0)}</p>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Remaining Balance</p>
+                        <p className={`font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
+                          {formatCurrency(getLoanRemainingBalance(selectedLoan))}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Installment</p>
-                        <p className="font-bold text-blue-600">{formatCurrency(selectedLoan.installmentAmount || 0)}</p>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Installment</p>
+                        <p className={`font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{formatCurrency(selectedLoan.installmentAmount || 0)}</p>
                       </div>
                     </div>
                   </div>
 
-                  {lastPayment && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-gray-900 mb-3">Last Payment Record</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-600">Payment Amount</p>
-                          <p className="font-bold text-green-600">{formatCurrency(lastPayment.paymentAmount || 0)}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Payment Date</p>
-                          <p className="font-bold text-gray-900">{new Date(lastPayment.paymentDate).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Payment Method</p>
-                          <p className="font-bold text-blue-600">{lastPayment.paymentMethod}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Balance After</p>
-                          <p className="font-bold text-gray-900">{formatCurrency(lastPayment.remainingBalance || 0)}</p>
-                        </div>
-                      </div>
-                      {lastPayment.notes && (
-                        <div className="mt-3 pt-3 border-t border-green-200">
-                          <p className="text-xs text-gray-600">Notes</p>
-                          <p className="text-sm text-gray-900 italic">{lastPayment.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Step 2: Payment Details</h3>
+                    <h3 className={`text-lg font-semibold mb-4 ${
+                      isDarkMode ? 'text-white' : 'text-gray-900'
+                    }`}>Step 2: Payment Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Payment Amount (₦) <span className="text-red-500">*</span>
+                        <label className={`block text-sm font-medium mb-2 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Payment Amount (?) <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="number"
@@ -735,16 +1066,21 @@ export default function RepaymentsPage() {
                           value={formData.paymentAmount}
                           onChange={handleInputChange}
                           disabled={submitting}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+                          className={`w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 ${
+                            isDarkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white' 
+                              : 'bg-white border-gray-300'
+                          }`}
                           placeholder="Enter amount"
                           min="0"
-                          max={selectedLoan.outstandingBalance || selectedLoan.remainingBalance}
+                          max={getLoanRemainingBalance(selectedLoan)}
                           step="0.01"
                         />
                       </div>
-
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className={`block text-sm font-medium mb-2 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
                           Payment Date <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -753,12 +1089,17 @@ export default function RepaymentsPage() {
                           value={formData.paymentDate}
                           onChange={handleInputChange}
                           disabled={submitting}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+                          className={`w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 ${
+                            isDarkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white' 
+                              : 'bg-white border-gray-300'
+                          }`}
                         />
                       </div>
-
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className={`block text-sm font-medium mb-2 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
                           Payment Method <span className="text-red-500">*</span>
                         </label>
                         <select
@@ -766,7 +1107,11 @@ export default function RepaymentsPage() {
                           value={formData.paymentMethod}
                           onChange={handleInputChange}
                           disabled={submitting}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+                          className={`w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 ${
+                            isDarkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white' 
+                              : 'bg-white border-gray-300'
+                          }`}
                         >
                           <option value="Cash">Cash</option>
                           <option value="Bank Transfer">Bank Transfer</option>
@@ -778,43 +1123,64 @@ export default function RepaymentsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Notes (Optional)</label>
                     <textarea
                       name="notes"
                       value={formData.notes}
                       onChange={handleInputChange}
                       disabled={submitting}
                       rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+                      className={`w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 ${
+                        isDarkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                          : 'bg-white border-gray-300'
+                      }`}
                       placeholder="Add any additional notes..."
                     />
                   </div>
 
                   {paymentAllocation && (
-                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
+                    <div className={`border-2 rounded-lg p-6 ${
+                      isDarkMode ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200'
+                    }`}>
+                      <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${
+                        isDarkMode ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        <CheckCircle className={`w-5 h-5 ${
+                          isDarkMode ? 'text-green-400' : 'text-green-600'
+                        }`} />
                         Payment Allocation (Interest First)
                       </h3>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        <div className="bg-white rounded-lg p-4 border border-green-200">
-                          <p className="text-xs text-gray-600 mb-1">Payment Amount</p>
-                          <p className="text-lg font-bold text-gray-900">{formatCurrency(paymentAllocation.paymentAmount)}</p>
+                        <div className={`rounded-lg p-4 border ${
+                          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-green-200'
+                        }`}>
+                          <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Payment Amount</p>
+                          <p className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(paymentAllocation.paymentAmount)}</p>
                         </div>
-                        <div className="bg-white rounded-lg p-4 border border-green-200">
+                        <div className={`rounded-lg p-4 border ${
+                          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-green-200'
+                        }`}>
                           <p className="text-xs text-gray-600 mb-1">To Interest</p>
                           <p className="text-lg font-bold text-orange-600">{formatCurrency(paymentAllocation.interestPortion)}</p>
                         </div>
                         <div className="bg-white rounded-lg p-4 border border-green-200">
-                          <p className="text-xs text-gray-600 mb-1">To Principal</p>
-                          <p className="text-lg font-bold text-blue-600">{formatCurrency(paymentAllocation.principalPortion)}</p>
+                          <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>To Principal</p>
+                          <p className={`text-lg font-bold ${
+                            isDarkMode ? 'text-orange-400' : 'text-orange-600'
+                          }`}>{formatCurrency(paymentAllocation.principalPortion)}</p>
                         </div>
-                        <div className="bg-white rounded-lg p-4 border border-green-200">
-                          <p className="text-xs text-gray-600 mb-1">New Balance</p>
-                          <p className="text-lg font-bold text-green-600">{formatCurrency(paymentAllocation.newRemainingBalance)}</p>
+                        <div className={`rounded-lg p-4 border ${
+                          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-green-200'
+                        }`}>
+                          <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>New Balance</p>
+                          <p className={`text-lg font-bold ${
+                            isDarkMode ? 'text-green-400' : 'text-green-600'
+                          }`}>{formatCurrency(paymentAllocation.newRemainingBalance)}</p>
                         </div>
                       </div>
-                      
                       <div className="bg-white rounded-lg p-4 border border-green-200">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -834,7 +1200,11 @@ export default function RepaymentsPage() {
                     <button
                       onClick={() => { setShowRecordModal(false); resetForm(); }}
                       disabled={submitting}
-                      className="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`px-6 py-2 border rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isDarkMode 
+                          ? 'border-gray-600 hover:bg-gray-700' 
+                          : 'border-gray-300 hover:bg-gray-50'
+                      }`}
                     >
                       Cancel
                     </button>
@@ -843,14 +1213,7 @@ export default function RepaymentsPage() {
                       disabled={submitting}
                       className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                      {submitting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Recording...
-                        </>
-                      ) : (
-                        'Record Payment'
-                      )}
+                      {submitting ? (<><Loader2 className="w-4 h-4 animate-spin" />Recording...</>) : 'Record Payment'}
                     </button>
                   </div>
                 </>
@@ -860,107 +1223,205 @@ export default function RepaymentsPage() {
         </div>
       )}
 
+      {/* Payment History Modal */}
+      {showPaymentHistory && selectedLoanHistory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto ${
+            isDarkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            <div className={`sticky top-0 border-b px-6 py-4 flex items-center justify-between z-10 ${
+              isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
+              <div>
+                <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Payment History</h2>
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{selectedLoanHistory.loan?.loanId} - {selectedLoanHistory.loan?.customer?.firstName} {selectedLoanHistory.loan?.customer?.lastName}</p>
+              </div>
+              <button onClick={() => setShowPaymentHistory(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className={`border rounded-lg p-4 mb-6 ${
+                isDarkMode ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-200'
+              }`}>
+                <div className="grid grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Total Payments</p>
+                    <p className="font-bold text-gray-900">{selectedLoanHistory.payments.length}</p>
+                  </div>
+                  <div>
+                    <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Total Paid</p>
+                    <p className="font-bold text-green-600">{formatCurrency(selectedLoanHistory.payments.reduce((sum: number, p: any) => sum + (p.paymentAmount || 0), 0))}</p>
+                  </div>
+                  <div>
+                    <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Current Balance</p>
+                    <p className="font-bold text-orange-600">{formatCurrency(selectedLoanHistory.payments[0]?.remainingBalance || 0)}</p>
+                  </div>
+                  <div>
+                    <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loan Product</p>
+                    <p className="font-bold text-blue-600">{selectedLoanHistory.loan?.loanProduct}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {selectedLoanHistory.payments.map((payment: any, idx: number) => (
+                  <div key={payment._id} className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
+                    isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
+                  }`}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-bold text-green-600">#{idx + 1}</span>
+                        </div>
+                        <div>
+                          <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(payment.paymentAmount)}</p>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(payment.paymentDate).toLocaleDateString()} � {payment.paymentMethod}</p>
+                        </div>
+                      </div>
+                      <button onClick={() => { setSelectedReceipt(payment); setShowReceiptModal(true); }} className={`text-xs font-medium ${
+                          isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
+                        }`}>
+                        View Receipt
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-xs">
+                      <div className={`rounded p-2 ${
+                        isDarkMode ? 'bg-orange-900/30' : 'bg-orange-50'
+                      }`}>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Interest</p>
+                        <p className={`font-semibold ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>{formatCurrency(payment.interestPortion || 0)}</p>
+                      </div>
+                      <div className={`rounded p-2 ${
+                        isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50'
+                      }`}>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Principal</p>
+                        <p className={`font-semibold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{formatCurrency(payment.principalPortion || 0)}</p>
+                      </div>
+                      <div className={`rounded p-2 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Balance After</p>
+                        <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(payment.remainingBalance || 0)}</p>
+                      </div>
+                    </div>
+                    {payment.notes && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Notes: <span className={`italic ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>{payment.notes}</span></p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Receipt Modal */}
       {showReceiptModal && selectedReceipt && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10 print:hidden">
-              <h2 className="text-xl font-bold text-gray-900">Payment Receipt</h2>
+          <div className={`rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto ${
+            isDarkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            <div className={`sticky top-0 border-b px-6 py-4 flex items-center justify-between z-10 print:hidden ${
+              isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Payment Receipt</h2>
               <div className="flex items-center gap-3">
-                <button 
-                  onClick={printReceipt}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                >
-                  <Printer className="w-4 h-4" />
-                  Print
+                <button onClick={printReceipt} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                  <Printer className="w-4 h-4" />Print
                 </button>
-                <button 
-                  onClick={() => setShowReceiptModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
+                <button onClick={() => setShowReceiptModal(false)} className={`p-2 rounded-lg transition-colors ${
+                    isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                  }`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
-
             <div className="p-8">
-              <div className="text-center mb-8 border-b-2 border-gray-300 pb-6">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">God's Will Empowerment Initiative</h1>
-                <p className="text-sm text-gray-600">Microfinance Services</p>
-                <p className="text-xs text-gray-500 mt-1">Lagos, Nigeria</p>
+              <div className={`text-center mb-8 border-b-2 pb-6 ${
+                isDarkMode ? 'border-gray-700' : 'border-gray-300'
+              }`}>
+                <h1 className={`text-2xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>God's Will Empowerment Initiative</h1>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Microfinance Services</p>
+                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>Lagos, Nigeria</p>
               </div>
-
               <div className="text-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-2">PAYMENT RECEIPT</h2>
-                <p className="text-sm text-gray-600">Receipt No: <span className="font-semibold text-gray-900">{selectedReceipt.repaymentId || selectedReceipt._id}</span></p>
+                <h2 className={`text-xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>PAYMENT RECEIPT</h2>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Receipt No:{' '}
+                  <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {selectedReceipt.repaymentId || selectedReceipt._id}
+                  </span>
+                </p>
               </div>
-
               <div className="space-y-6 mb-8">
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">Customer Name</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedReceipt.loan?.customer?.firstName} {selectedReceipt.loan?.customer?.lastName}</p>
+                    <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Customer Name</p>
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {getCustomerNameFromPayment(selectedReceipt) || 'Unknown Customer'}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">Loan ID</p>
-                    <p className="text-sm font-semibold text-blue-600">{selectedReceipt.loan?.loanId}</p>
+                    <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Loan ID</p>
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{selectedReceipt.loan?.loanId}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">Loan Type</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedReceipt.loan?.loanProduct}</p>
+                    <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Loan Type</p>
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{selectedReceipt.loan?.loanProduct}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">Payment Date</p>
-                    <p className="text-sm font-semibold text-gray-900">{new Date(selectedReceipt.paymentDate).toLocaleDateString()}</p>
+                    <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Payment Date</p>
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{new Date(selectedReceipt.paymentDate).toLocaleDateString()}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">Payment Method</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedReceipt.paymentMethod}</p>
+                    <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Payment Method</p>
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{selectedReceipt.paymentMethod}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">Recorded By</p>
-                    <p className="text-sm font-semibold text-gray-900">Admin</p>
+                    <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Recorded By</p>
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Admin</p>
                   </div>
                 </div>
               </div>
-
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <h3 className="font-semibold text-gray-900 mb-4">Payment Breakdown</h3>
+              <div className={`rounded-lg p-6 mb-6 ${
+                isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+              }`}>
+                <h3 className={`font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Payment Breakdown</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Payment Amount</span>
-                    <span className="text-lg font-bold text-green-600">{formatCurrency(selectedReceipt.paymentAmount)}</span>
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Payment Amount</span>
+                    <span className={`text-lg font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>{formatCurrency(selectedReceipt.paymentAmount)}</span>
                   </div>
-                  <div className="border-t border-gray-300 pt-3">
+                  <div className={`border-t pt-3 ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-gray-600">Interest Deducted</span>
-                      <span className="text-sm font-semibold text-orange-600">{formatCurrency(selectedReceipt.interestPortion || 0)}</span>
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Interest Deducted</span>
+                      <span className={`text-sm font-semibold ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>{formatCurrency(selectedReceipt.interestPortion || 0)}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Principal Paid</span>
-                      <span className="text-sm font-semibold text-blue-600">{formatCurrency(selectedReceipt.principalPortion || 0)}</span>
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Principal Paid</span>
+                      <span className={`text-sm font-semibold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{formatCurrency(selectedReceipt.principalPortion || 0)}</span>
                     </div>
                   </div>
-                  <div className="border-t-2 border-gray-300 pt-3">
+                  <div className={`border-t-2 pt-3 ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-semibold text-gray-900">Remaining Balance</span>
-                      <span className="text-lg font-bold text-gray-900">{formatCurrency(selectedReceipt.remainingBalance || 0)}</span>
+                      <span className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Remaining Balance</span>
+                      <span className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(selectedReceipt.remainingBalance || 0)}</span>
                     </div>
                   </div>
                 </div>
               </div>
-
               {selectedReceipt.notes && (
-                <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                  <p className="text-xs text-gray-600 mb-1">Notes</p>
-                  <p className="text-sm text-gray-900">{selectedReceipt.notes}</p>
+                <div className={`rounded-lg p-4 mb-6 ${
+                  isDarkMode ? 'bg-blue-900/20' : 'bg-blue-50'
+                }`}>
+                  <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Notes</p>
+                  <p className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{selectedReceipt.notes}</p>
                 </div>
               )}
-
-              <div className="text-center pt-6 border-t border-gray-300">
-                <p className="text-xs text-gray-600 mb-2">Thank you for your payment!</p>
-                <p className="text-xs text-gray-500">This is an official receipt from God's Will Empowerment Initiative</p>
-                <p className="text-xs text-gray-500 mt-1">Generated on: {new Date().toLocaleString()}</p>
+              <div className={`text-center pt-6 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+                <p className={`text-center pt-6 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>Thank you for your payment!</p>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>This is an official receipt from God's Will Empowerment Initiative</p>
+                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>Generated on: {new Date().toLocaleString()}</p>
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Lexend } from "next/font/google";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Toaster } from 'sonner';
 
 
 export const metadata: Metadata = {
@@ -64,6 +65,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${lexend.variable} antialiased`}
       >
         {children}
+        <Toaster position="top-right" />
       </body>
     </html>
   );

@@ -1,10 +1,11 @@
 "use client";
-import { MoveRight } from "lucide-react";
+import { MoveRight, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import authService from "@/services/authService";
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   return <Login />;
@@ -25,7 +26,7 @@ export function Login() {
       setCurrentImage((prev) => (prev + 1) % backgroundImages.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [backgroundImages.length]);
+  }, []);
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-white">
@@ -56,10 +57,10 @@ export function Login() {
 
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 md:px-10 text-white">
           <div className="max-w-md">
-            <h2 className="text-2xl md:text-4xl font-bold mb-3 typing-text">
+            <h2 className="text-2xl md:text-4xl font-bold mb-3">
               Admin Dashboard Login Page
             </h2>
-            <p className="text-sm md:text-[1.1rem] leading-relaxed fade-in-text mt-2">
+            <p className="text-sm md:text-[1.1rem] leading-relaxed mt-2">
               Log in to continue protecting what matters most.
             </p>
           </div>
@@ -113,6 +114,7 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <form className="w-full">
@@ -132,27 +134,43 @@ function LoginForm() {
             setEmail(e.target.value);
             setError("");
           }}
-          className="peer w-full h-12 md:h-14 px-4 pt-5 rounded-md bg-gray-100 border border-gray-300"
+          className="peer w-full h-12 md:h-14 px-4 pt-5 rounded-md bg-gray-100 border border-gray-300 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
         />
-        <label className="absolute text-xs md:text-sm text-gray-500 duration-300 transform -translate-y-4 scale-75 top-3 md:top-4 left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0">
+        <label className="absolute text-xs md:text-sm text-gray-500 duration-300 transform -translate-y-4 scale-75 top-3 md:top-4 left-4 z-10 origin-[0] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:left-0 peer-focus:top-0 peer-focus:px-2 peer-focus:text-green-500">
           Email
         </label>
       </div>
 
       <div className="mb-4 relative">
         <input
-          type="password"
+          type={showPassword ? "text" : "password"}
+          id="password"
           value={password}
-          placeholder=" "
           onChange={(e) => {
             setPassword(e.target.value);
             setError("");
           }}
-          className="peer w-full h-12 md:h-14 px-4 pt-5 rounded-md bg-gray-100 border border-gray-300"
+          placeholder=" "
+          className="peer w-full h-12 md:h-14 px-4 pt-5 pr-12 rounded-md bg-gray-100 border border-gray-300 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
         />
-        <label className="absolute text-xs md:text-sm text-gray-500 duration-300 transform -translate-y-4 scale-75 top-3 md:top-4 left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0">
+        <label
+          htmlFor="password"
+          className="absolute text-xs md:text-sm text-gray-500 duration-300 transform -translate-y-4 scale-75 top-3 md:top-4 left-4 z-10 origin-[0] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:left-0 peer-focus:top-0 peer-focus:px-2 peer-focus:text-green-500"
+        >
           Password
         </label>
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none focus:text-gray-700 transition-colors"
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          {showPassword ? (
+            <EyeOff className="h-5 w-5" />
+          ) : (
+            <Eye className="h-5 w-5" />
+          )}
+        </button>
       </div>
 
       <SimpleButton 
@@ -160,13 +178,6 @@ function LoginForm() {
         password={password} 
         setError={setError}
       />
-
-      {/* Demo Credentials */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <p className="text-xs text-gray-600 font-semibold mb-2">Demo Credentials:</p>
-        <p className="text-xs text-gray-600">📧 Email: admin@godswill.org</p>
-        <p className="text-xs text-gray-600">🔑 Password: Admin@123</p>
-      </div>
     </form>
   );
 }
@@ -187,27 +198,77 @@ function SimpleButton({
 
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
+
+    // Early validation
+    if (!email || !password) {
+      return;
+    }
+
     setIsLoading(true);
     setError("");
+    
+    // Show loading toast
+    const loadingToast = toast.loading("Signing in...");
 
     try {
-      // Call real login API
+      // Call real login API using your authService
       const response = await authService.login({ email, password });
 
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+
       if (response.success) {
-        // Success! Redirect based on role
+        // Show success toast
+        toast.success(response.message || "Login successful!");
+        
+        // Redirect based on role
         if (response.user.role === 'Admin') {
           router.push("/admin");
         } else {
           router.push("/dashboard");
         }
       } else {
-        setError(response.message || "Login failed. Please try again.");
+        // Show error message
+        const errorMessage = response.message || "Incorrect credentials. Please try again.";
+        setError(errorMessage);
+        toast.error(errorMessage);
       }
     } catch (error: any) {
-      // Handle errors
-      const errorMessage = error.response?.data?.message || "Invalid email or password. Please try again.";
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      
+      // Get user-friendly error message
+      let errorMessage = "Something went wrong. Please try again.";
+      
+      if (error.response?.data?.message) {
+        const apiMessage = error.response.data.message;
+        
+        // Convert technical errors to user-friendly messages
+        if (apiMessage.includes("buffering timed out") || apiMessage.includes("timeout")) {
+          errorMessage = "Connection timeout. Please check your internet and try again.";
+        } else if (apiMessage.includes("Network Error") || apiMessage.includes("ECONNREFUSED")) {
+          errorMessage = "Cannot connect to server. Please try again later.";
+        } else if (apiMessage.includes("Invalid credentials") || apiMessage.includes("incorrect")) {
+          errorMessage = "Incorrect email or password. Please try again.";
+        } else if (apiMessage.includes("User not found")) {
+          errorMessage = "Account not found. Please check your email.";
+        } else if (apiMessage.includes("Account is deactivated") || apiMessage.includes("inactive")) {
+          errorMessage = "Your account has been deactivated. Contact administrator.";
+        } else {
+          // Use the API message if it's already user-friendly
+          errorMessage = apiMessage;
+        }
+      } else if (error.message) {
+        // Handle other error types
+        if (error.message.includes("Network Error")) {
+          errorMessage = "No internet connection. Please check your network.";
+        } else if (error.message.includes("timeout")) {
+          errorMessage = "Request timeout. Please try again.";
+        }
+      }
+      
       setError(errorMessage);
+      toast.error(errorMessage);
       console.error("Login error:", error);
     } finally {
       setIsLoading(false);

@@ -1,24 +1,14 @@
-"use client"; 
-import Image from "next/image";
+"use client";
 
 import Header from "@/components/Header"
 import Hero from "@/components/Hero";
-import LoanOptions from "@/components/LoanOptions";
-import ContactForm from "@/components/ContactForm";
-import Footer from "@/components/Footer"
 
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen overflow-y-auto">
       <Header />
       <Hero />
-      <LoanOptions />
-      <ContactForm />
-      <Footer />
     </div>
   );
 }
 
-// 69615f39a45f3c3744a44d9e
-
-// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NWZjY2I4ZGI4MzBlMjM1ZWE2NjFkMSIsInJvbGUiOiJBZG1pbiIsImlhdCI6MTc2Nzk4ODg4NiwiZXhwIjoxNzY4NTkzNjg2fQ.Ey_fn0TsMNZYYkohS9KddJvYs6urloYfVTMuNWnTVIk

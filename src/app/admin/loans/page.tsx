@@ -5,8 +5,9 @@ import {
   Wallet, Search, Plus, Edit, Eye, 
   DollarSign, Clock, CheckCircle, AlertCircle,
   Download, ChevronLeft, ChevronRight, Printer, TrendingUp,
-  X, Loader2, UserCheck, XCircle
+  X, Loader2, UserCheck, XCircle, RefreshCw
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -158,6 +159,8 @@ export default function LoansPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   
   const itemsPerPage = 10;
 
@@ -174,6 +177,18 @@ export default function LoansPage() {
     fetchCustomers();
   }, []);
 
+    useEffect(() => {
+    const checkDarkMode = () => {
+      const savedTheme = localStorage.getItem('theme');
+      const htmlHasDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(savedTheme === 'dark' || htmlHasDark);
+    };
+
+    checkDarkMode();
+    const interval = setInterval(checkDarkMode, 300);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchLoans = async () => {
     try {
       setLoading(true);
@@ -186,6 +201,14 @@ export default function LoansPage() {
       setLoading(false);
     }
   };
+
+    const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchLoans();
+    setRefreshing(false);
+  };
+
+window.dispatchEvent(new Event('resize'));
 
   const fetchCustomers = async () => {
     try {
@@ -331,14 +354,14 @@ export default function LoansPage() {
 
     try {
       if (!formData.customerId || !formData.principal || !formData.tenure || !formData.startDate || !formData.purpose) {
-        alert('Please fill in all required fields');
+        toast.error('Please fill in all required fields');
         setSubmitting(false);
         return;
       }
 
       const calculation = calculateLoanDetails();
       if (!calculation || !selectedCustomer) {
-        alert(`Tenure cannot exceed maximum allowed for ${selectedCustomer?.preferredLoanProduct} loan`);
+        toast.error(`Tenure cannot exceed maximum allowed for ${selectedCustomer?.preferredLoanProduct} loan`);
         setSubmitting(false);
         return;
       }
@@ -361,7 +384,7 @@ export default function LoansPage() {
         !tenureUnit || tenureUnit.trim() === '' ||
         isNaN(installmentAmount) || installmentAmount <= 0
       ) {
-        alert('Error calculating loan details. Please check your inputs.');
+        toast.error('Error calculating loan details. Please check your inputs.');
         console.error('Invalid calculation values:', {
           principalAmount,
           interestRate,
@@ -405,7 +428,7 @@ export default function LoansPage() {
       if (missingOrInvalid.length > 0) {
         console.error('Invalid or missing fields before sending:', missingOrInvalid);
         console.error('Loan data:', loanData);
-        alert(`Error: Invalid data detected. Please check: ${missingOrInvalid.join(', ')}`);
+        toast.error(`Error: Invalid data detected. Please check: ${missingOrInvalid.join(', ')}`);
         setSubmitting(false);
         return;
       }
@@ -427,10 +450,10 @@ export default function LoansPage() {
       await fetchLoans();
       setShowCreateModal(false);
       resetForm();
-      alert('✅ Loan created successfully!');
+      toast.success('✅ Loan created successfully!');
     } catch (err: any) {
       console.error('Error creating loan:', err);
-      alert('❌ ' + (err.message || 'Failed to create loan'));
+      toast.error('❌ ' + (err.message || 'Failed to create loan'));
     } finally {
       setSubmitting(false);
     }
@@ -444,23 +467,23 @@ export default function LoansPage() {
     try {
       await loanService.approveLoan(loan._id);
       await fetchLoans();
-      alert('✅ Loan approved successfully!');
+      toast.success('✅ Loan approved successfully!');
     } catch (err: any) {
-      alert('❌ Failed to approve: ' + err.message);
+      toast.error('❌ Failed to approve: ' + err.message);
     }
   };
 
   const handleDisburseLoan = async (loan: any) => {
-    if (!confirm(`Disburse ${formatCurrency(loan.principal)} to ${loan.customer?.firstName} ${loan.customer?.lastName}?`)) {
+    if (!confirm(`Disburse ${formatCurrency(loan.principalAmount)} to ${loan.customer?.firstName} ${loan.customer?.lastName}?`)) {
       return;
     }
 
     try {
       await loanService.disburseLoan(loan._id);
       await fetchLoans();
-      alert('✅ Loan disbursed successfully!');
+      toast.success('✅ Loan disbursed successfully!');
     } catch (err: any) {
-      alert('❌ Failed to disburse: ' + err.message);
+      toast.error('❌ Failed to disburse: ' + err.message);
     }
   };
 
@@ -472,9 +495,9 @@ export default function LoansPage() {
     try {
       await loanService.rejectLoan(loan._id);
       await fetchLoans();
-      alert('✅ Loan rejected!');
+      toast.success('✅ Loan rejected!');
     } catch (err: any) {
-      alert('❌ Failed to reject: ' + err.message);
+      toast.error('❌ Failed to reject: ' + err.message);
     }
   };
 
@@ -500,8 +523,8 @@ export default function LoansPage() {
       l.loanId,
       `${l.customer?.firstName} ${l.customer?.lastName}`,
       l.loanProduct,
-      l.principal,
-      l.totalAmount,
+      l.principalAmount,
+      l.totalPayable,
       l.status,
       new Date(l.createdAt || '').toLocaleDateString()
     ]);
@@ -540,13 +563,13 @@ export default function LoansPage() {
   const getStatusBadge = (status: string) => {
     const statusLower = status?.toLowerCase() || '';
     const badges: any = {
-      pending: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-      approved: 'bg-blue-100 text-blue-700 border-blue-300',
-      disbursed: 'bg-green-100 text-green-700 border-green-300',
-      active: 'bg-green-100 text-green-700 border-green-300',
-      overdue: 'bg-red-100 text-red-700 border-red-300',
-      completed: 'bg-gray-100 text-gray-700 border-gray-300',
-      rejected: 'bg-red-100 text-red-700 border-red-300'
+      pending: isDarkMode ? 'bg-yellow-900/30 text-yellow-300 border-yellow-700' : 'bg-yellow-100 text-yellow-700 border-yellow-300',
+      approved: isDarkMode ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-100 text-blue-700 border-blue-300',
+      disbursed: isDarkMode ? 'bg-green-900/30 text-green-300 border-green-700' : 'bg-green-100 text-green-700 border-green-300',
+      active: isDarkMode ? 'bg-green-900/30 text-green-300 border-green-700' : 'bg-green-100 text-green-700 border-green-300',
+      overdue: isDarkMode ? 'bg-red-900/30 text-red-300 border-red-700' : 'bg-red-100 text-red-700 border-red-300',
+      completed: isDarkMode ? 'bg-gray-900/30 text-gray-300 border-gray-700' : 'bg-gray-100 text-gray-700 border-gray-300',
+      rejected: isDarkMode ? 'bg-red-900/30 text-red-300 border-red-700' : 'bg-red-100 text-red-700 border-red-300'
     };
     return badges[statusLower] || 'bg-gray-100 text-gray-700 border-gray-300';
   };
@@ -567,11 +590,11 @@ export default function LoansPage() {
 
   const getProductBadge = (product: string) => {
     const badges: any = {
-      Monthly: 'bg-blue-100 text-blue-700 border-blue-300',
-      Weekly: 'bg-purple-100 text-purple-700 border-purple-300',
-      Daily: 'bg-green-100 text-green-700 border-green-300'
+      Monthly: isDarkMode ? 'bg-blue-900/30 text-blue-300 border-blue-700' : 'bg-blue-100 text-blue-700 border-blue-300',
+      Weekly: isDarkMode ? 'bg-purple-900/30 text-purple-300 border-purple-700' : 'bg-purple-100 text-purple-700 border-purple-300',
+      Daily: isDarkMode ? 'bg-green-900/30 text-green-300 border-green-700' : 'bg-green-100 text-green-700 border-green-300'
     };
-    return badges[product] || 'bg-gray-100 text-gray-700 border-gray-300';
+    return badges[product] || (isDarkMode ? 'bg-gray-900/30 text-gray-300 border-gray-700' : 'bg-gray-100 text-gray-700 border-gray-300');
   };
 
   const stats = {
@@ -581,361 +604,542 @@ export default function LoansPage() {
     completedLoans: loans.filter((l: any) => l.status?.toLowerCase() === 'completed').length,
     overdueLoans: loans.filter((l: any) => l.status?.toLowerCase() === 'overdue').length,
     totalDisbursed: loans.reduce((sum: number, l: any) => 
-      (l.status?.toLowerCase() !== 'pending' && l.status?.toLowerCase() !== 'rejected') ? sum + (l.principal || 0) : sum, 0),
+      (l.status?.toLowerCase() !== 'pending' && l.status?.toLowerCase() !== 'rejected') ? sum + (l.principalAmount || 0) : sum, 0),
     totalRepaid: loans.reduce((sum: number, l: any) => sum + (l.amountPaid || 0), 0),
     totalOutstanding: loans.reduce((sum: number, l: any) => 
       (l.status?.toLowerCase() === 'active' || l.status?.toLowerCase() === 'disbursed' || l.status?.toLowerCase() === 'overdue') 
-        ? sum + (l.outstandingBalance || 0) : sum, 0)
+        ? sum + (l.remainingBalance || 0) : sum, 0)
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className={`flex items-center justify-center h-screen ${
+        isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-orange-50 via-white to-blue-50'
+      }`}>
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading loans...</p>
+          <Loader2 className={`w-12 h-12 animate-spin mx-auto mb-4 ${
+            isDarkMode ? 'text-orange-500' : 'text-blue-600'
+          }`} />
+          <p className={`font-semibold text-lg ${isDarkMode ? 'text-white' : 'text-gray-700'}`}>
+            Loading loans...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
+    <div className={`min-h-screen transition-colors duration-200 px-1 ${
+      isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-orange-50 via-white to-blue-50'
+    }`}>
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Loan Management</h1>
-            <p className="text-gray-600">Create, approve, and manage loan applications</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={exportToCSV}
-              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </button>
-            <button 
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              Print
-            </button>
-            <button 
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-              Create Loan
-            </button>
+      <div className={`border-b ${
+        isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
+        <div className="px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                Loan Management
+              </h1>
+              <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Create, approve, and manage loan applications
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className={`p-2.5 border rounded-xl transition-colors disabled:opacity-50 ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' 
+                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''} ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                }`} />
+              </button>
+              <button 
+                onClick={exportToCSV}
+                className={`px-4 py-2.5 border rounded-xl transition-colors flex items-center gap-2 ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' 
+                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <Download className={`w-4 h-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`} />
+                <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Export
+                </span>
+              </button>
+              <button 
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-lime-500 text-white shadow-lg shadow-lime-600/50 rounded-lg font-semibold hover:bg-lime-600 shadow-md transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Create Loan
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Loans</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalLoans}</p>
+        <div className={`rounded-2xl p-6 border shadow-sm relative overflow-hidden ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 opacity-20 ${
+              isDarkMode ? 'bg-green-600' : 'bg-green-100'
+            }`}></div>
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-3 bg-blue-500 rounded-xl shadow-lg">
+                  <Wallet className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <p className={`text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Total Loans
+              </p>
+              <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                {stats.totalLoans}
+              </p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Wallet className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Active Loans</p>
-              <p className="text-3xl font-bold text-green-600">{stats.activeLoans}</p>
+        <div className={`rounded-2xl p-6 border shadow-sm relative overflow-hidden ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 opacity-20 ${
+              isDarkMode ? 'bg-green-600' : 'bg-green-100'
+            }`}></div>
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-3 bg-green-500 rounded-xl shadow-lg">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <p className={`text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Active Loans
+              </p>
+              <p className={`text-3xl font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                {stats.activeLoans}
+              </p>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Pending Approval</p>
-              <p className="text-3xl font-bold text-yellow-600">{stats.pendingLoans}</p>
+        <div className={`rounded-2xl p-6 border shadow-sm relative overflow-hidden ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+ <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 opacity-20 ${
+              isDarkMode ? 'bg-yellow-600' : 'bg-yellow-100'
+            }`}></div>
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-3 bg-yellow-500 rounded-xl shadow-lg">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <p className={`text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Pending Approval
+              </p>
+              <p className={`text-3xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                {stats.pendingLoans}
+              </p>
             </div>
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <Clock className="w-6 h-6 text-yellow-600" />
-            </div>
-          </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Overdue</p>
-              <p className="text-3xl font-bold text-red-600">{stats.overdueLoans}</p>
+        <div className={`rounded-2xl p-6 border shadow-sm relative overflow-hidden ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+          <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 opacity-20 ${
+              isDarkMode ? 'bg-yellow-600' : 'bg-yellow-100'
+            }`}></div>
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-3 bg-yellow-500 rounded-xl shadow-lg">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <p className={`text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+               Overdue
+              </p>
+              <p className={`text-3xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                {stats.overdueLoans}
+              </p>
             </div>
-            <div className="p-3 bg-red-100 rounded-lg">
-              <AlertCircle className="w-6 h-6 text-red-600" />
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Financial Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <DollarSign className="w-5 h-5 text-blue-600" />
-            <p className="text-sm font-medium text-gray-600">Total Disbursed</p>
+        {/* Financial Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className={`rounded-2xl p-6 border shadow-sm ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex items-center gap-3 mb-2">
+              <DollarSign className={`w-5 h-5 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Total Disbursed
+              </p>
+            </div>
+            <p className={`text-2xl font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+              {formatCurrency(stats.totalDisbursed)}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-blue-600">{formatCurrency(stats.totalDisbursed)}</p>
-        </div>
 
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            <p className="text-sm font-medium text-gray-600">Total Repaid</p>
+          <div className={`rounded-2xl p-6 border shadow-sm ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex items-center gap-3 mb-2">
+              <TrendingUp className={`w-5 h-5 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`} />
+              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Total Repaid
+              </p>
+            </div>
+            <p className={`text-2xl font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+              {formatCurrency(stats.totalRepaid)}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalRepaid)}</p>
-        </div>
 
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <AlertCircle className="w-5 h-5 text-orange-600" />
-            <p className="text-sm font-medium text-gray-600">Outstanding</p>
+          <div className={`rounded-2xl p-6 border shadow-sm ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex items-center gap-3 mb-2">
+              <AlertCircle className={`w-5 h-5 ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`} />
+              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Outstanding
+              </p>
+            </div>
+            <p className={`text-2xl font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
+              {formatCurrency(stats.totalOutstanding)}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-orange-600">{formatCurrency(stats.totalOutstanding)}</p>
         </div>
-      </div>
 
       {/* Search and Filter */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by customer name or loan ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+      <div className={`rounded-2xl border p-4 mb-6 shadow-sm ${
+          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className={`w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                isDarkMode ? 'text-gray-500' : 'text-gray-400'
+              }`} />
+              <input
+                type="text"
+                placeholder="Search by customer name or loan ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`w-full pl-10 pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300'
+                }`}
+              />
+            </div>
+            
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className={`px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300'
+              }`}
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="disbursed">Disbursed</option>
+              <option value="active">Active</option>
+              <option value="overdue">Overdue</option>
+              <option value="completed">Completed</option>
+              <option value="rejected">Rejected</option>
+            </select>
+
+            <select
+              value={filterProduct}
+              onChange={(e) => setFilterProduct(e.target.value)}
+              className={`px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300'
+              }`}
+            >
+              <option value="all">All Products</option>
+              <option value="Monthly">Monthly (25%)</option>
+              <option value="Weekly">Weekly (27%)</option>
+              <option value="Daily">Daily (18%)</option>
+            </select>
           </div>
-          
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="disbursed">Disbursed</option>
-            <option value="active">Active</option>
-            <option value="overdue">Overdue</option>
-            <option value="completed">Completed</option>
-            <option value="rejected">Rejected</option>
-          </select>
-
-          <select
-            value={filterProduct}
-            onChange={(e) => setFilterProduct(e.target.value)}
-            className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="all">All Products</option>
-            <option value="Monthly">Monthly (25%)</option>
-            <option value="Weekly">Weekly (27%)</option>
-            <option value="Daily">Daily (18%)</option>
-          </select>
         </div>
-      </div>
 
-      {/* Loans Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Loan ID</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Customer</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Principal</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Total Payable</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Outstanding</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Tenure</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {currentLoans.length === 0 ? (
+             {/* Loans Table */}
+        <div className={`rounded-2xl border overflow-hidden shadow-sm ${
+          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className={`border-b ${
+                isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+              }`}>
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center">
-                    <Wallet className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg mb-2">No loans found</p>
-                    <p className="text-gray-400 text-sm">
-                      {loans.length === 0 
-                        ? 'Click "Create Loan" to start' 
-                        : 'Try adjusting your search or filters'}
-                    </p>
-                  </td>
+                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Loan ID</th>
+                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Customer</th>
+                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Product</th>
+                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Principal</th>
+                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Total Payable</th>
+                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Outstanding</th>
+                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Tenure</th>
+                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Status</th>
+                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Actions</th>
                 </tr>
-              ) : (
-                currentLoans.map((loan: any) => (
-                  <tr key={loan._id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-bold text-blue-600">{loan.loanId}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <span className="text-sm font-semibold text-gray-900">
-                          {loan.customer?.firstName} {loan.customer?.lastName}
-                        </span>
-                        <p className="text-xs text-gray-500">{loan.customer?.customerId}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getProductBadge(loan.loanProduct)}`}>
-                        {loan.loanProduct}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-semibold text-gray-900">{formatCurrency(loan.principalAmount)}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm">
-                        <p className="font-semibold text-gray-900">{formatCurrency(loan.totalPayable)}</p>
-                        <p className="text-xs text-gray-500">{loan.interestRate}% interest</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-semibold text-orange-600">
-                        {formatCurrency(loan.remainingBalance || 0)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-xs">
-                        <p className="text-gray-900 font-semibold">
-                          {loan.tenure} {loan.loanProduct === 'Monthly' ? 'months' : loan.loanProduct === 'Weekly' ? 'weeks' : 'days'}
-                        </p>
-                        {loan.startDate && <p className="text-gray-600">{new Date(loan.startDate).toLocaleDateString()}</p>}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(loan.status)}`}>
-                        {getStatusIcon(loan.status)}
-                        {loan.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => handleView(loan)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {loan.status?.toLowerCase() === 'pending' && (
-                          <>
-                            <button 
-                              onClick={() => handleApproveLoan(loan)}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors" 
-                              title="Approve Loan"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => handleRejectLoan(loan)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
-                              title="Reject Loan"
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                        {(loan.status === 'Approved' || loan.status?.toLowerCase() === 'approved') && (
-                          <button 
-                            onClick={() => handleDisburseLoan(loan)}
-                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" 
-                            title="Disburse Loan"
-                          >
-                            <DollarSign className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+              </thead>
+              <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                {currentLoans.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-16 text-center">
+                      <Wallet className={`w-16 h-16 mx-auto mb-4 ${
+                        isDarkMode ? 'text-gray-600' : 'text-gray-300'
+                      }`} />
+                      <p className={`text-lg mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        No loans found
+                      </p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                        {loans.length === 0 
+                          ? 'Click "Create Loan" to start' 
+                          : 'Try adjusting your search or filters'}
+                      </p>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {filteredLoans.length > 0 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-            <div className="text-sm text-gray-600">
-              Showing <span className="font-semibold">{startIndex + 1}</span> to{' '}
-              <span className="font-semibold">{Math.min(endIndex, filteredLoans.length)}</span> of{' '}
-              <span className="font-semibold">{filteredLoans.length}</span> loans
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <span className="px-4 py-2 text-sm font-medium">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
+                ) : (
+                  currentLoans.map((loan: any) => (
+                    <tr key={loan._id} className={`transition-colors ${
+                      isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                    }`}>
+                      <td className="px-6 py-4">
+                        <span className={`text-sm font-bold ${
+                          isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                        }`}>{loan.loanId}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <span className={`text-sm font-semibold ${
+                            isDarkMode ? 'text-white' : 'text-gray-900'
+                          }`}>
+                            {loan.customer?.firstName} {loan.customer?.lastName}
+                          </span>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                            {loan.customer?.customerId}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getProductBadge(loan.loanProduct)}`}>
+                          {loan.loanProduct}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-sm font-semibold ${
+                          isDarkMode ? 'text-white' : 'text-gray-900'
+                        }`}>{formatCurrency(loan.principalAmount)}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm">
+                          <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {formatCurrency(loan.totalPayable)}
+                          </p>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                            {loan.interestRate}% interest
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-sm font-semibold ${
+                          isDarkMode ? 'text-orange-400' : 'text-orange-600'
+                        }`}>
+                          {formatCurrency(loan.remainingBalance || 0)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs">
+                          <p className={`font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                            {loan.tenure} {loan.loanProduct === 'Monthly' ? 'months' : loan.loanProduct === 'Weekly' ? 'weeks' : 'days'}
+                          </p>
+                          {loan.startDate && (
+                            <p className={isDarkMode ? 'text-gray-500' : 'text-gray-600'}>
+                              {new Date(loan.startDate).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(loan.status)}`}>
+                          {getStatusIcon(loan.status)}
+                          {loan.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleView(loan)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isDarkMode 
+                                ? 'text-blue-400 hover:bg-blue-900/30' 
+                                : 'text-blue-600 hover:bg-blue-50'
+                            }`}
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {loan.status?.toLowerCase() === 'pending' && (
+                            <>
+                              <button 
+                                onClick={() => handleApproveLoan(loan)}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  isDarkMode 
+                                    ? 'text-green-400 hover:bg-green-900/30' 
+                                    : 'text-green-600 hover:bg-green-50'
+                                }`}
+                                title="Approve Loan"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleRejectLoan(loan)}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  isDarkMode 
+                                    ? 'text-red-400 hover:bg-red-900/30' 
+                                    : 'text-red-600 hover:bg-red-50'
+                                }`}
+                                title="Reject Loan"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          {(loan.status === 'Approved' || loan.status?.toLowerCase() === 'approved') && (
+                            <button 
+                              onClick={() => handleDisburseLoan(loan)}
+                              className={`p-2 rounded-lg transition-colors ${
+                                isDarkMode 
+                                  ? 'text-purple-400 hover:bg-purple-900/30' 
+                                  : 'text-purple-600 hover:bg-purple-50'
+                              }`}
+                              title="Disburse Loan"
+                            >
+                              <DollarSign className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+          
+ {filteredLoans.length > 0 && (
+            <div className={`px-6 py-4 border-t flex items-center justify-between ${
+              isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+            }`}>
+              <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Showing <span className="font-semibold">{startIndex + 1}</span> to{' '}
+                <span className="font-semibold">{Math.min(endIndex, filteredLoans.length)}</span> of{' '}
+                <span className="font-semibold">{filteredLoans.length}</span> loans
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`p-2 border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDarkMode 
+                      ? 'border-gray-600 hover:bg-gray-700' 
+                      : 'border-gray-300 hover:bg-white'
+                  }`}
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <span className={`px-4 py-2 text-sm font-medium ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDarkMode 
+                      ? 'border-gray-600 hover:bg-gray-700' 
+                      : 'border-gray-300 hover:bg-white'
+                  }`}
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
       {/* Create Loan Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+          <div className={`rounded-2xl w-full max-w-5xl max-h-[100vh] flex flex-col shadow-2xl ${
+            isDarkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            <div className={`border-b px-6 py-4 flex items-center justify-between shrink-0 ${
+              isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Create New Loan</h2>
-                <p className="text-sm text-gray-600 mt-1">Select approved customer and enter loan details</p>
+                <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Create New Loan</h2>
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Select approved customer and enter loan details</p>
               </div>
               <button 
                 onClick={() => { setShowCreateModal(false); resetForm(); }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                }`}
                 disabled={submitting}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Step 1: Select Customer</h3>
+            <div className="overflow-y-auto flex-1 p-6 space-y-6">
+              <div className={`rounded-xl p-6 border ${
+                isDarkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-blue-50 border-blue-200'
+              }`}>
+                <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>Step 1: Select Customer</h3>
                 {customers.length === 0 ? (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                    <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-2" />
-                    <p className="text-yellow-800 font-medium">No approved customers available</p>
-                    <p className="text-yellow-700 text-sm mt-1">Please approve customers first before creating loans</p>
+                    <AlertCircle className={`w-12 h-12 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} mx-auto mb-2`} />
+                    <p className={`${isDarkMode ? 'text-yellow-800' : 'text-yellow-800'} font-medium`}>No approved customers available</p>
+                    <p className={`${isDarkMode ? 'text-yellow-800' : 'text-yellow-800'} font-medium`}>Please approve customers first before creating loans</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className={`${isDarkMode ? 'space-y-3' : 'space-y-3'}`}>
                     {/* Search Field */}
                     <div className="relative">
                       <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
@@ -955,7 +1159,7 @@ export default function LoansPage() {
                       value={formData.customerId}
                       onChange={handleInputChange}
                       disabled={submitting}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className={`${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100`}
                     >
                       <option value="">Choose a customer...</option>
                       {filteredCustomers.map((customer: any) => {
@@ -970,7 +1174,7 @@ export default function LoansPage() {
                     </select>
 
                     {/* Results count */}
-                    <p className="text-xs text-gray-600">
+                    <p className={`${isDarkMode ? 'text-xs text-gray-400' : 'text-xs text-gray-600'}`}>
                       Showing {filteredCustomers.length} of {customers.length} customers
                       {customerSearchTerm && ` (Filtered by "${customerSearchTerm}")`}
                     </p>
@@ -980,22 +1184,22 @@ export default function LoansPage() {
 
               {selectedCustomer && (
                 <>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className={`bg-blue-50 border border-blue-200 rounded-lg p-4 ${isDarkMode ? 'bg-blue-50 border border-blue-700' : 'bg-blue-50 border border-blue-200'}`}>
                     <h4 className="font-semibold text-gray-900 mb-2">Customer Loan Product</h4>
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
-                        <p className="text-gray-600">Product</p>
+                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Product</p>
                         <p className="font-bold text-gray-900">{selectedCustomer.preferredLoanProduct}</p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Interest Rate</p>
+                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Interest Rate</p>
                         <p className="font-bold text-gray-900">
                           {selectedCustomer.preferredLoanProduct === 'Monthly' ? '25%' : 
                            selectedCustomer.preferredLoanProduct === 'Weekly' ? '27%' : '18%'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Max Tenure</p>
+                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Max Tenure</p>
                         <p className="font-bold text-gray-900">
                           {selectedCustomer.preferredLoanProduct === 'Monthly' ? '6 months' : 
                            selectedCustomer.preferredLoanProduct === 'Weekly' ? '24 weeks' : '20 days'}
@@ -1005,10 +1209,14 @@ export default function LoansPage() {
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Step 2: Loan Details</h3>
+                    <h3 className={`text-lg font-semibold mb-4 ${
+                      isDarkMode ? 'text-white' : 'text-gray-900'
+                    }`}>Step 2: Loan Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className={`block text-sm font-medium mb-2 ${
+                          isDarkMode ? 'text-white' : 'text-gray-700'
+                        }`}>
                           Principal Amount (₦) <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -1017,14 +1225,20 @@ export default function LoansPage() {
                           value={formData.principal}
                           onChange={handleInputChange}
                           disabled={submitting}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                          className={`w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 ${
+                            isDarkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white' 
+                              : 'bg-white border-gray-300'
+                          }`}
                           placeholder="Enter amount"
                           min="0"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className={`block text-sm font-medium mb-2 ${
+                          isDarkMode ? 'text-white' : 'text-gray-700'
+                        }`}>
                           Tenure <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -1033,7 +1247,11 @@ export default function LoansPage() {
                           value={formData.tenure}
                           onChange={handleInputChange}
                           disabled={submitting}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                          className={`w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 ${
+                            isDarkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white' 
+                              : 'bg-white border-gray-300'
+                          }`}
                           placeholder={
                             selectedCustomer.preferredLoanProduct === 'Monthly' ? '1-6 months' :
                             selectedCustomer.preferredLoanProduct === 'Weekly' ? '1-24 weeks' :
@@ -1048,8 +1266,8 @@ export default function LoansPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Start Date <span className="text-red-500">*</span>
+                        <label className={`${isDarkMode ? 'block text-sm font-medium text-white mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}`}>
+                          Start Date <span className={`${isDarkMode ? 'text-red-500' : 'text-red-500'}`}>*</span>
                         </label>
                         <input
                           type="date"
@@ -1057,14 +1275,16 @@ export default function LoansPage() {
                           value={formData.startDate}
                           onChange={handleInputChange}
                           disabled={submitting}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                          className={`${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100`}
                         />
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${
+                          isDarkMode ? 'text-white' : 'text-gray-700'
+                        }`}>
                       Loan Purpose <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -1073,18 +1293,18 @@ export default function LoansPage() {
                       onChange={handleInputChange}
                       disabled={submitting}
                       rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className={`${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 placeholder-gray-400`}
                       placeholder="Enter the purpose of this loan..."
                     />
                   </div>
 
                   {loanCalculation && (
-                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <div className={`${isDarkMode ? 'bg-green-900 border-2 border-green-700' : 'bg-green-50 border-2 border-green-200'} rounded-lg p-6`}>
+                      <h3 className={`text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                         <DollarSign className="w-5 h-5 text-green-600" />
                         Loan Calculation Summary
                       </h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div className={`${isDarkMode ? 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4' : 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4'}`}>
                         <div className="bg-white rounded-lg p-4 border border-green-200">
                           <p className="text-xs text-gray-600 mb-1">Principal</p>
                           <p className="text-lg font-bold text-gray-900">{formatCurrency(loanCalculation.principal)}</p>
@@ -1130,14 +1350,14 @@ export default function LoansPage() {
                     <button
                       onClick={() => { setShowCreateModal(false); resetForm(); }}
                       disabled={submitting}
-                      className="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:text-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleSubmit}
                       disabled={submitting}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="flex items-center gap-2 px-4 py-2 bg-lime-500 text-white shadow-lg shadow-lime-600/50 rounded-lg font-semibold hover:bg-lime-600 shadow-md transition-colors"
                     >
                       {submitting ? (
                         <>
@@ -1158,65 +1378,65 @@ export default function LoansPage() {
 
       {/* View Loan Modal */}
       {showViewModal && selectedLoan && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+        <div className={`${isDarkMode ? 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4' : 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'}`}>
+          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto`}>
+            <div className={`${isDarkMode ? 'sticky top-0 bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between z-10' : 'sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10'}`}>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Loan Details</h2>
-                <p className="text-sm text-gray-600 mt-1">{selectedLoan.loanId}</p>
+                <h2 className={`${isDarkMode ? 'text-xl font-bold text-white' : 'text-xl font-bold text-gray-900'}`}>Loan Details</h2>
+                <p className="text-sm text-white mt-1">{selectedLoan.loanId}</p>
               </div>
               <button 
                 onClick={() => setShowViewModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className={`${isDarkMode ? 'p-2 hover:bg-lime-500 text-white rounded-lg transition-colors' : 'p-2 hover:bg-gray-100 rounded-lg transition-colors'}`}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Customer Information</h3>
+              <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
+                <h3 className={`${isDarkMode ? 'font-semibold text-white mb-3' : 'font-semibold text-gray-900 mb-3'}`}>Customer Information</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className="text-gray-600">Name:</span> <span className="font-medium">{selectedLoan.customer?.firstName} {selectedLoan.customer?.lastName}</span></div>
-                  <div><span className="text-gray-600">Customer ID:</span> <span className="font-medium">{selectedLoan.customer?.customerId}</span></div>
-                  <div><span className="text-gray-600">Phone:</span> <span className="font-medium">{selectedLoan.customer?.phoneNumber}</span></div>
-                  <div><span className="text-gray-600">Type:</span> <span className="font-medium">{selectedLoan.customer?.customerType}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Name:</span> <span className={`${isDarkMode ? 'font-medium' : 'font-medium'}`}>{selectedLoan.customer?.firstName} {selectedLoan.customer?.lastName}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Customer ID:</span> <span className="font-medium">{selectedLoan.customer?.customerId}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Phone:</span> <span className="font-medium">{selectedLoan.customer?.phoneNumber}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Type:</span> <span className="font-medium">{selectedLoan.customer?.customerType}</span></div>
                 </div>
               </div>
 
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Loan Details</h3>
+              <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
+                <h3 className={`${isDarkMode ? 'font-semibold text-white mb-3' : 'font-semibold text-gray-900 mb-3'}`}>Loan Details</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className="text-gray-600">Product:</span> <span className="font-medium">{selectedLoan.loanProduct}</span></div>
-                  <div><span className="text-gray-600">Interest Rate:</span> <span className="font-medium">{selectedLoan.interestRate}%</span></div>
-                  <div><span className="text-gray-600">Principal:</span> <span className="font-medium">{formatCurrency(selectedLoan.principal)}</span></div>
-                  <div><span className="text-gray-600">Interest:</span> <span className="font-medium">{formatCurrency(selectedLoan.interestAmount)}</span></div>
-                  <div><span className="text-gray-600">Total Payable:</span> <span className="font-medium">{formatCurrency(selectedLoan.totalAmount)}</span></div>
-                  <div><span className="text-gray-600">Installment:</span> <span className="font-medium">{formatCurrency(selectedLoan.installmentAmount)}</span></div>
-                  <div><span className="text-gray-600">Tenure:</span> <span className="font-medium">{selectedLoan.tenure} {selectedLoan.loanProduct === 'Monthly' ? 'months' : selectedLoan.loanProduct === 'Weekly' ? 'weeks' : 'days'}</span></div>
-                  <div><span className="text-gray-600">Status:</span> <span className={`font-semibold ${selectedLoan.status?.toLowerCase() === 'active' || selectedLoan.status?.toLowerCase() === 'disbursed' ? 'text-green-600' : selectedLoan.status?.toLowerCase() === 'pending' ? 'text-yellow-600' : selectedLoan.status?.toLowerCase() === 'completed' ? 'text-gray-600' : 'text-red-600'}`}>{selectedLoan.status}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Product:</span> <span className="font-medium">{selectedLoan.loanProduct}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Interest Rate:</span> <span className="font-medium">{selectedLoan.interestRate}%</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Principal:</span> <span className="font-medium">{formatCurrency(selectedLoan.principalAmount)}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Interest:</span> <span className="font-medium">{formatCurrency(selectedLoan.interestAmount)}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Payable:</span> <span className="font-medium">{formatCurrency(selectedLoan.totalAmount)}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Installment:</span> <span className="font-medium">{formatCurrency(selectedLoan.installmentAmount)}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Tenure:</span> <span className="font-medium">{selectedLoan.tenure} {selectedLoan.loanProduct === 'Monthly' ? 'months' : selectedLoan.loanProduct === 'Weekly' ? 'weeks' : 'days'}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Status:</span> <span className={`font-semibold ${selectedLoan.status?.toLowerCase() === 'active' || selectedLoan.status?.toLowerCase() === 'disbursed' ? 'text-green-600' : selectedLoan.status?.toLowerCase() === 'pending' ? 'text-yellow-600' : selectedLoan.status?.toLowerCase() === 'completed' ? 'text-gray-600' : 'text-red-600'}`}>{selectedLoan.status}</span></div>
                 </div>
               </div>
 
-              <div className="bg-green-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Payment Information</h3>
+              <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
+                <h3 className={`${isDarkMode ? 'font-semibold text-white mb-3' : 'font-semibold text-gray-900 mb-3'}`}>Payment Information</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className="text-gray-600">Amount Paid:</span> <span className="font-medium text-green-600">{formatCurrency(selectedLoan.amountPaid || 0)}</span></div>
-                  <div><span className="text-gray-600">Outstanding:</span> <span className="font-medium text-orange-600">{formatCurrency(selectedLoan.outstandingBalance || 0)}</span></div>
-                  <div><span className="text-gray-600">Start Date:</span> <span className="font-medium">{selectedLoan.startDate ? new Date(selectedLoan.startDate).toLocaleDateString() : 'N/A'}</span></div>
-                  <div><span className="text-gray-600">End Date:</span> <span className="font-medium">{selectedLoan.endDate ? new Date(selectedLoan.endDate).toLocaleDateString() : 'N/A'}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Amount Paid:</span> <span className="font-medium text-green-600">{formatCurrency(selectedLoan.amountPaid || 0)}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Outstanding:</span> <span className="font-medium text-orange-600">{formatCurrency(selectedLoan.outstandingBalance || 0)}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Start Date:</span> <span className="font-medium">{selectedLoan.startDate ? new Date(selectedLoan.startDate).toLocaleDateString() : 'N/A'}</span></div>
+                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>End Date:</span> <span className="font-medium">{selectedLoan.endDate ? new Date(selectedLoan.endDate).toLocaleDateString() : 'N/A'}</span></div>
                   {selectedLoan.disbursedDate && (
-                    <div><span className="text-gray-600">Disbursed:</span> <span className="font-medium">{new Date(selectedLoan.disbursedDate).toLocaleDateString()}</span></div>
+                    <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Disbursed:</span> <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{new Date(selectedLoan.disbursedDate).toLocaleDateString()}</span></div>
                   )}
                   {selectedLoan.approvedDate && (
-                    <div><span className="text-gray-600">Approved:</span> <span className="font-medium">{new Date(selectedLoan.approvedDate).toLocaleDateString()}</span></div>
+                    <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Approved:</span> <span className="font-medium">{new Date(selectedLoan.approvedDate).toLocaleDateString()}</span></div>
                   )}
                 </div>
               </div>
 
               <div className="border-t border-gray-200 pt-4">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Created:</span> {new Date(selectedLoan.createdAt).toLocaleDateString()} at {new Date(selectedLoan.createdAt).toLocaleTimeString()}
+                <p className={`${isDarkMode ? 'text-white' : 'text-gray-600'}`}>
+                  <span className={`font-medium ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>Created:</span> {new Date(selectedLoan.createdAt).toLocaleDateString()} at {new Date(selectedLoan.createdAt).toLocaleTimeString()}
                 </p>
               </div>
             </div>

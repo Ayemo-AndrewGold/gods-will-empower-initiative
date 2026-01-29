@@ -48,7 +48,7 @@ useEffect(() => {
   }, [isModalOpen]);
 
   return (
-    <div className="relative mt-15 h-[550px]">
+    <div className="relative mt-15 h-[93vh]">
     
       {backgroundImages.map((src, index) => (
         <Image 
@@ -132,13 +132,11 @@ useEffect(() => {
                     href="/login"
                     className="block w-full text-center bg-blue-600 text-white py-3 rounded-lg shadow hover:bg-blue-700 transition"
                   >
-                    Builder Login
                   </Link>
                     <Link
                     href="/signup"
                     className="block w-full text-center bg-blue-600 text-white py-3 rounded-lg shadow hover:bg-blue-700 transition"
                   >
-                    Builder Registration
                   </Link>
                 </div>
               </>
