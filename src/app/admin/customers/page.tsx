@@ -5,7 +5,8 @@ import { Users, Search, Plus, Trash2, Eye, UserCheck, Phone, Mail, X, Download, 
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 
-const API_URL = 'http://localhost:5000/api';
+// const API_URL = 'http://localhost:5000/api';
+const API_URL = 'process.env.NEXT_PUBLIC_API_URL';
 
 const normalizePhoneNumber = (phone: string): string => {
   if (!phone) return '';

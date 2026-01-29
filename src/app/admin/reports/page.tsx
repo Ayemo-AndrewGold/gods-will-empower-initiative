@@ -13,7 +13,8 @@ import {
   ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
 
-const API_URL = 'http://localhost:5000/api';
+// const API_URL = 'http://localhost:5000/api';
+const API_URL = 'process.env.NEXT_PUBLIC_API_URL';
 
 // API Services - Same as used in customer, loan, and repayment pages
 const reportService = {

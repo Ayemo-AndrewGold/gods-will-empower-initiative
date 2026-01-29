@@ -6,7 +6,8 @@ import {
   DollarSign, Calendar, Eye, Loader2, AlertCircle
 } from 'lucide-react';
 
-const API_URL = 'http://localhost:5000/api';
+// const API_URL = 'http://localhost:5000/api';
+const API_URL = 'process.env.NEXT_PUBLIC_API_URL';
 
 const repaymentService = {
   getAllRepayments: async () => {
