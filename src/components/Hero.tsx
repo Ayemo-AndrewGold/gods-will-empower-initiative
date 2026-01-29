@@ -63,28 +63,25 @@ useEffect(() => {
       <div className="absolute inset-0 bg-black/65"></div>
 
       {/* Hero content */}
-      <div className="absolute inset-0 flex items-center">
+         <div className="absolute inset-0 flex items-center">
         <div data-aos="zoom-in" className="container mx-auto px-4">
-    <h1 className="text-5xl font-bold text-white mb-4">
-      God's Will Empowerment<br /> Empowerment Initiative
-    </h1>
-    <p className="text-xl text-white mb-8">
-      Easy Accessing microfinance...
-    </p>
-
-          <div className="flex space-x-4">
-            <Link href="/login">
-            <button
-              className="bg-green-600 text-white px-6 py-3 font-semibold rounded-lg shadow-md hover:bg-green-700 transition"
-            >
-              
-              Login Now<span className="ml-2">→</span>
-            </button>
-             </Link>
-            
+          {/* Content wrapper with professional background */}
+          <div className="max-w-xl backdrop-blur-lg bg-white/10 p-6 md:p-8 rounded-2xl border border-white/20 shadow-2xl">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+              Gods Will <br /> Empowerment <br/> Initiative
+              <span className="text-lg md:text-xl text-white/95 mb-8 leading-relaxed block">easy accessing...</span>
+            </h1>    
+              <Link href="/login">
+                <button
+                  className="w-full sm:w-auto bg-white text-green-600 px-8 font-bold py-3 rounded-lg shadow-lg hover:bg-gray-50 hover:shadow-xl transition-all duration-300 hover:scale-105"
+                >
+                  Login
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
+
 
       {/* Modal */}
       {isModalOpen && (
