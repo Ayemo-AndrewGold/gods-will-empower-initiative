@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -98,11 +96,15 @@ const customerService = {
     return res.json();
   },
 
-  rejectCustomer: async (id: string): Promise<any> => {
+  rejectCustomer: async (id: string, rejectionReason: string): Promise<any> => {
     const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/customers/${id}/reject`, {
       method: 'PUT',
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify({ rejectionReason })
     });
     if (!res.ok) throw new Error('Failed to reject customer');
     return res.json();
@@ -151,24 +153,23 @@ export default function CustomersPage() {
     fetchCustomers(); 
   }, []);
 
-      useEffect(() => {
-      const checkDarkMode = () => {
-        const savedTheme = localStorage.getItem('theme');
-        const htmlHasDark = document.documentElement.classList.contains('dark');
-        setIsDarkMode(savedTheme === 'dark' || htmlHasDark);
-      };
-  
-      checkDarkMode();
-      const interval = setInterval(checkDarkMode, 300);
-      return () => clearInterval(interval);
-    }, []);
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const savedTheme = localStorage.getItem('theme');
+      const htmlHasDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(savedTheme === 'dark' || htmlHasDark);
+    };
+
+    checkDarkMode();
+    const interval = setInterval(checkDarkMode, 300);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchCustomers = async () => {
     try {
       setLoading(true);
       const data = await customerService.getAllCustomers();
       console.log('All customers fetched:', data);
-      // Show all customers - let the status filter handle display
       const allCustomers = Array.isArray(data) ? data : [];
       console.log('All customers loaded:', allCustomers);
       setCustomers(allCustomers);
@@ -181,7 +182,18 @@ export default function CustomersPage() {
   };
 
   const handleApproveCustomer = async (customer: any) => {
-    if (!confirm(`Approve customer ${customer.firstName} ${customer.lastName}?`)) {
+    const result = await Swal.fire({
+      title: 'Approve Customer?',
+      text: `Are you sure you want to approve ${customer.firstName} ${customer.lastName}?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, approve',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -195,18 +207,38 @@ export default function CustomersPage() {
   };
 
   const handleRejectCustomer = async (customer: any) => {
-    if (!confirm(`Reject customer ${customer.firstName} ${customer.lastName}? This action cannot be undone.`)) {
-      return;
-    }
+    const result = await Swal.fire({
+      title: 'Reject Customer?',
+      text: `Are you sure you want to reject ${customer.firstName} ${customer.lastName}?`,
+      input: 'textarea',
+      inputLabel: 'Rejection Reason',
+      inputPlaceholder: 'Enter reason for rejection...',
+      inputAttributes: {
+        'aria-label': 'Enter reason for rejection'
+      },
+      inputValidator: (value) => {
+        if (!value) {
+          return 'You need to provide a reason for rejection!';
+        }
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Yes, reject',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    });
 
-    try {
-      await customerService.rejectCustomer(customer._id);
-      await fetchCustomers();
-      toast.success('✅ Customer rejected!');
-    } catch (err: any) {
-      toast.error('❌ Failed to reject: ' + err.message);
+    if (result.isConfirmed && result.value) {
+      try {
+        await customerService.rejectCustomer(customer._id, result.value);
+        await fetchCustomers();
+        toast.success('✅ Customer rejected!');
+      } catch (err: any) {
+        toast.error('❌ Failed to reject: ' + err.message);
+      }
     }
   };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchCustomers();
@@ -379,7 +411,20 @@ export default function CustomersPage() {
 
 
   const handleDelete = async (customer: any) => {
-    if (!confirm(`Delete ${customer.firstName} ${customer.lastName}? This action cannot be undone.`)) return;
+    const result = await Swal.fire({
+      title: 'Delete Customer?',
+      text: `Are you sure you want to delete ${customer.firstName} ${customer.lastName}? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
     
     try {
       await customerService.deleteCustomer(customer._id);
@@ -483,7 +528,6 @@ export default function CustomersPage() {
 
   const showGroupFields = formData.customerType === 'Group';
   const showSecretaryFields = formData.preferredLoanProduct === 'Weekly' && showGroupFields;
-  //p-8 bg-gray-50 min-h-screen
 
   return (
     <div className={`min-h-screen px-1 transition-colors duration-200 ${
@@ -518,9 +562,6 @@ export default function CustomersPage() {
                 }`}>
               <Download className={`w-4 h-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`} />Export CSV
             </button>
-            {/* <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2">
-              <Printer className="w-4 h-4" />Print
-            </button> */}
              <button 
              onClick={() => setShowAddModal(true)} 
               className="flex items-center gap-2 px-4 py-2 bg-lime-500 text-white shadow-lg shadow-lime-600/50 rounded-lg font-semibold hover:bg-lime-600 shadow-md transition-colors"
