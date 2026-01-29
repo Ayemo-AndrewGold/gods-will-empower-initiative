@@ -66,11 +66,10 @@ useEffect(() => {
       <div className="absolute inset-0 flex items-center">
         <div data-aos="zoom-in" className="container mx-auto px-4">
     <h1 className="text-5xl font-bold text-white mb-4">
-      Empower Your Future <br /> with Smart Microfinance
+      God's Will Empowerment<br /> Empowerment Initiative
     </h1>
     <p className="text-xl text-white mb-8">
-      Accessible microfinance solutions designed to help you grow. <br />
-      Start today and take control of your financial journey.
+      Easy Accessing microfinance...
     </p>
 
           <div className="flex space-x-4">
