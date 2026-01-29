@@ -208,7 +208,11 @@ export default function LoansPage() {
     setRefreshing(false);
   };
 
-window.dispatchEvent(new Event('resize'));
+useEffect(() => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('resize'));
+  }
+}, []);
 
   const fetchCustomers = async () => {
     try {

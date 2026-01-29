@@ -57,7 +57,7 @@ useEffect(() => {
         alt={`Background ${index + 1}`}
         fill
         priority={index === 0}
-        className={`object-cover transition-opacity duraion-[2000ms] ${index === currentImage ? "opacity-100" : "opacity-0"}`}
+        className={`object-cover transition-opacity duration-[2000ms] ${index === currentImage ? "opacity-100" : "opacity-0"}`}
         />
       ))}
       <div className="absolute inset-0 bg-black/65"></div>
@@ -83,13 +83,6 @@ useEffect(() => {
             </button>
              </Link>
             
-            {/* <Link href="/login">
-            <button
-              className="bg-white text-green-600 px-6 font-semibold py-3 rounded-lg shadow-md hover:bg-gray-100 transition"
-            >
-              Login
-            </button>
-            </Link> */}
           </div>
         </div>
       </div>
@@ -117,80 +110,6 @@ useEffect(() => {
             >
               <X size={22} />
             </button>
-
-            {/* Auth Modal */}
-            {modalType === "auth" && (
-              <>
-                <h2 className="text-2xl font-bold mb-4 text-white text-center">
-                  Choose Login
-                </h2>
-                <p className="text-sm text-gray-100 mb-6 text-center">
-                  Pick an action to continue.
-                </p>
-                <div className="space-y-3">
-                  <Link
-                    href="/login"
-                    className="block w-full text-center bg-blue-600 text-white py-3 rounded-lg shadow hover:bg-blue-700 transition"
-                  >
-                  </Link>
-                    <Link
-                    href="/signup"
-                    className="block w-full text-center bg-blue-600 text-white py-3 rounded-lg shadow hover:bg-blue-700 transition"
-                  >
-                  </Link>
-                </div>
-              </>
-            )}
-
-            {/* Contact Modal */}
-            {modalType === "contact" && (
-              <>
-                <h2 className="text-3xl font-bold text-center mb-6 text-green-700">
-                  Contact Us
-                </h2>
-                <p className="text-center text-gray-600 mb-8">
-                  We'd love to hear from you. Fill out the form below and we’ll get back to you shortly.
-                </p>
-
-                <form className="space-y-5">
-                  <input
-                    type="text"
-                    placeholder="Full Name"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 
-                               focus:outline-none focus:ring-2 focus:ring-green-500 
-                               bg-white shadow-sm transition"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email Address"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 
-                               focus:outline-none focus:ring-2 focus:ring-green-500 
-                               bg-white shadow-sm transition"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Subject"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 
-                               focus:outline-none focus:ring-2 focus:ring-green-500 
-                               bg-white shadow-sm transition"
-                  />
-                  <textarea
-                    rows={4}
-                    placeholder="Your Message"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 
-                               focus:outline-none focus:ring-2 focus:ring-green-500 
-                               bg-white shadow-sm transition"
-                  ></textarea>
-                  <button
-                    type="submit"
-                    className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold 
-                               shadow-md hover:bg-green-700 hover:shadow-lg transition"
-                  >
-                    Send Message ✉️
-                  </button>
-                </form>
-              </>
-            )}
           </div>
         </div>
       )}
