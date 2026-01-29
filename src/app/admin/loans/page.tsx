@@ -177,7 +177,7 @@ export default function LoansPage() {
     fetchCustomers();
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     const checkDarkMode = () => {
       const savedTheme = localStorage.getItem('theme');
       const htmlHasDark = document.documentElement.classList.contains('dark');
@@ -202,17 +202,17 @@ export default function LoansPage() {
     }
   };
 
-    const handleRefresh = async () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
     await fetchLoans();
     setRefreshing(false);
   };
 
-useEffect(() => {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('resize'));
-  }
-}, []);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('resize'));
+    }
+  }, []);
 
   const fetchCustomers = async () => {
     try {
@@ -264,19 +264,19 @@ useEffect(() => {
       case 'Monthly':
         interestRate = 25;
         tenureLabel = 'month(s)';
-        tenureUnit = 'months'; // Backend expects plural: 'months', 'weeks', 'days'
+        tenureUnit = 'months';
         maxTenure = 6;
         break;
       case 'Weekly':
         interestRate = 27;
         tenureLabel = 'week(s)';
-        tenureUnit = 'weeks'; // Backend expects plural
+        tenureUnit = 'weeks';
         maxTenure = 24;
         break;
       case 'Daily':
         interestRate = 18;
         tenureLabel = 'day(s)';
-        tenureUnit = 'days'; // Backend expects plural
+        tenureUnit = 'days';
         maxTenure = 20;
         break;
     }
@@ -402,14 +402,13 @@ useEffect(() => {
         return;
       }
 
-      // Prepare loan data - ensure all fields are properly typed and present
-      // Round monetary values to 2 decimal places to avoid floating point precision issues
+      // Prepare loan data
       const loanData: Record<string, any> = {
         customer: String(formData.customerId).trim(),
         loanProduct: String(selectedCustomer.preferredLoanProduct),
         principalAmount: Math.round(principalAmount * 100) / 100,
         interestRate: Math.round(interestRate * 100) / 100,
-        interestAmount: Math.round(interestAmount * 100) / 100, // Fix floating point precision
+        interestAmount: Math.round(interestAmount * 100) / 100,
         totalPayable: Math.round(totalPayable * 100) / 100,
         tenure: Number(tenure),
         tenureUnit: String(tenureUnit).trim(),
@@ -417,12 +416,10 @@ useEffect(() => {
         purpose: String(formData.purpose || 'General loan purpose').trim()
       };
       
-      // Add startDate only if provided (optional field)
       if (formData.startDate && formData.startDate.trim() !== '') {
         loanData.startDate = String(formData.startDate).trim();
       }
       
-      // Verify all required fields are present and valid
       const requiredFields = ['customer', 'loanProduct', 'principalAmount', 'interestRate', 'interestAmount', 'totalPayable', 'tenure', 'tenureUnit', 'installmentAmount', 'purpose'];
       const missingOrInvalid = requiredFields.filter(field => {
         const value = (loanData as any)[field];
@@ -437,18 +434,7 @@ useEffect(() => {
         return;
       }
 
-      // Debug: Log the data being sent
       console.log('Loan data being sent:', JSON.stringify(loanData, null, 2));
-      console.log('Calculation object:', JSON.stringify(calculation, null, 2));
-      console.log('All values check:', {
-        principalAmount: loanData.principalAmount,
-        interestRate: loanData.interestRate,
-        interestAmount: loanData.interestAmount,
-        totalPayable: loanData.totalPayable,
-        tenure: loanData.tenure,
-        tenureUnit: loanData.tenureUnit,
-        installmentAmount: loanData.installmentAmount
-      });
 
       await loanService.createLoan(loanData);
       await fetchLoans();
@@ -575,7 +561,7 @@ useEffect(() => {
       completed: isDarkMode ? 'bg-gray-900/30 text-gray-300 border-gray-700' : 'bg-gray-100 text-gray-700 border-gray-300',
       rejected: isDarkMode ? 'bg-red-900/30 text-red-300 border-red-700' : 'bg-red-100 text-red-700 border-red-300'
     };
-    return badges[statusLower] || 'bg-gray-100 text-gray-700 border-gray-300';
+    return badges[statusLower] || (isDarkMode ? 'bg-gray-900/30 text-gray-300 border-gray-700' : 'bg-gray-100 text-gray-700 border-gray-300');
   };
 
   const getStatusIcon = (status: string) => {
@@ -690,12 +676,12 @@ useEffect(() => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 px-8 pt-6">
         <div className={`rounded-2xl p-6 border shadow-sm relative overflow-hidden ${
             isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
           }`}>
             <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 opacity-20 ${
-              isDarkMode ? 'bg-green-600' : 'bg-green-100'
+              isDarkMode ? 'bg-blue-600' : 'bg-blue-100'
             }`}></div>
             <div className="relative">
               <div className="flex items-center justify-between mb-3">
@@ -736,7 +722,7 @@ useEffect(() => {
         <div className={`rounded-2xl p-6 border shadow-sm relative overflow-hidden ${
             isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
           }`}>
- <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 opacity-20 ${
+            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 opacity-20 ${
               isDarkMode ? 'bg-yellow-600' : 'bg-yellow-100'
             }`}></div>
             <div className="relative">
@@ -758,71 +744,71 @@ useEffect(() => {
             isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
           }`}>
           <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 opacity-20 ${
-              isDarkMode ? 'bg-yellow-600' : 'bg-yellow-100'
+              isDarkMode ? 'bg-red-600' : 'bg-red-100'
             }`}></div>
             <div className="relative">
               <div className="flex items-center justify-between mb-3">
-                <div className="p-3 bg-yellow-500 rounded-xl shadow-lg">
-                  <Clock className="w-6 h-6 text-white" />
+                <div className="p-3 bg-red-500 rounded-xl shadow-lg">
+                  <AlertCircle className="w-6 h-6 text-white" />
                 </div>
               </div>
               <p className={`text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                Overdue
               </p>
-              <p className={`text-3xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+              <p className={`text-3xl font-bold ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
                 {stats.overdueLoans}
               </p>
             </div>
         </div>
       </div>
 
-        {/* Financial Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className={`rounded-2xl p-6 border shadow-sm ${
-            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
-            <div className="flex items-center gap-3 mb-2">
-              <DollarSign className={`w-5 h-5 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Total Disbursed
-              </p>
-            </div>
-            <p className={`text-2xl font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-              {formatCurrency(stats.totalDisbursed)}
+      {/* Financial Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-8">
+        <div className={`rounded-2xl p-6 border shadow-sm ${
+          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <div className="flex items-center gap-3 mb-2">
+            <DollarSign className={`w-5 h-5 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+            <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Total Disbursed
             </p>
           </div>
-
-          <div className={`rounded-2xl p-6 border shadow-sm ${
-            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
-            <div className="flex items-center gap-3 mb-2">
-              <TrendingUp className={`w-5 h-5 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`} />
-              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Total Repaid
-              </p>
-            </div>
-            <p className={`text-2xl font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
-              {formatCurrency(stats.totalRepaid)}
-            </p>
-          </div>
-
-          <div className={`rounded-2xl p-6 border shadow-sm ${
-            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
-            <div className="flex items-center gap-3 mb-2">
-              <AlertCircle className={`w-5 h-5 ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`} />
-              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Outstanding
-              </p>
-            </div>
-            <p className={`text-2xl font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-              {formatCurrency(stats.totalOutstanding)}
-            </p>
-          </div>
+          <p className={`text-2xl font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+            {formatCurrency(stats.totalDisbursed)}
+          </p>
         </div>
 
+        <div className={`rounded-2xl p-6 border shadow-sm ${
+          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <div className="flex items-center gap-3 mb-2">
+            <TrendingUp className={`w-5 h-5 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`} />
+            <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Total Repaid
+            </p>
+          </div>
+          <p className={`text-2xl font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+            {formatCurrency(stats.totalRepaid)}
+          </p>
+        </div>
+
+        <div className={`rounded-2xl p-6 border shadow-sm ${
+          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <div className="flex items-center gap-3 mb-2">
+            <AlertCircle className={`w-5 h-5 ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`} />
+            <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Outstanding
+            </p>
+          </div>
+          <p className={`text-2xl font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
+            {formatCurrency(stats.totalOutstanding)}
+          </p>
+        </div>
+      </div>
+
       {/* Search and Filter */}
-      <div className={`rounded-2xl border p-4 mb-6 shadow-sm ${
+      <div className={`rounded-2xl border p-4 mb-6 shadow-sm mx-8 ${
           isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
         }`}>
           <div className="flex flex-col md:flex-row gap-4">
@@ -879,236 +865,236 @@ useEffect(() => {
           </div>
         </div>
 
-             {/* Loans Table */}
-        <div className={`rounded-2xl border overflow-hidden shadow-sm ${
-          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        }`}>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className={`border-b ${
-                isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
-              }`}>
-                <tr>
-                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Loan ID</th>
-                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Customer</th>
-                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Product</th>
-                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Principal</th>
-                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Total Payable</th>
-                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Outstanding</th>
-                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Tenure</th>
-                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Status</th>
-                  <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Actions</th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {currentLoans.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-6 py-16 text-center">
-                      <Wallet className={`w-16 h-16 mx-auto mb-4 ${
-                        isDarkMode ? 'text-gray-600' : 'text-gray-300'
-                      }`} />
-                      <p className={`text-lg mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        No loans found
-                      </p>
-                      <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                        {loans.length === 0 
-                          ? 'Click "Create Loan" to start' 
-                          : 'Try adjusting your search or filters'}
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  currentLoans.map((loan: any) => (
-                    <tr key={loan._id} className={`transition-colors ${
-                      isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
-                    }`}>
-                      <td className="px-6 py-4">
-                        <span className={`text-sm font-bold ${
-                          isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                        }`}>{loan.loanId}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div>
-                          <span className={`text-sm font-semibold ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
-                            {loan.customer?.firstName} {loan.customer?.lastName}
-                          </span>
-                          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                            {loan.customer?.customerId}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getProductBadge(loan.loanProduct)}`}>
-                          {loan.loanProduct}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-sm font-semibold ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>{formatCurrency(loan.principalAmount)}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm">
-                          <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                            {formatCurrency(loan.totalPayable)}
-                          </p>
-                          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                            {loan.interestRate}% interest
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-sm font-semibold ${
-                          isDarkMode ? 'text-orange-400' : 'text-orange-600'
-                        }`}>
-                          {formatCurrency(loan.remainingBalance || 0)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-xs">
-                          <p className={`font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
-                            {loan.tenure} {loan.loanProduct === 'Monthly' ? 'months' : loan.loanProduct === 'Weekly' ? 'weeks' : 'days'}
-                          </p>
-                          {loan.startDate && (
-                            <p className={isDarkMode ? 'text-gray-500' : 'text-gray-600'}>
-                              {new Date(loan.startDate).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(loan.status)}`}>
-                          {getStatusIcon(loan.status)}
-                          {loan.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => handleView(loan)}
-                            className={`p-2 rounded-lg transition-colors ${
-                              isDarkMode 
-                                ? 'text-blue-400 hover:bg-blue-900/30' 
-                                : 'text-blue-600 hover:bg-blue-50'
-                            }`}
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {loan.status?.toLowerCase() === 'pending' && (
-                            <>
-                              <button 
-                                onClick={() => handleApproveLoan(loan)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  isDarkMode 
-                                    ? 'text-green-400 hover:bg-green-900/30' 
-                                    : 'text-green-600 hover:bg-green-50'
-                                }`}
-                                title="Approve Loan"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleRejectLoan(loan)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  isDarkMode 
-                                    ? 'text-red-400 hover:bg-red-900/30' 
-                                    : 'text-red-600 hover:bg-red-50'
-                                }`}
-                                title="Reject Loan"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                          {(loan.status === 'Approved' || loan.status?.toLowerCase() === 'approved') && (
-                            <button 
-                              onClick={() => handleDisburseLoan(loan)}
-                              className={`p-2 rounded-lg transition-colors ${
-                                isDarkMode 
-                                  ? 'text-purple-400 hover:bg-purple-900/30' 
-                                  : 'text-purple-600 hover:bg-purple-50'
-                              }`}
-                              title="Disburse Loan"
-                            >
-                              <DollarSign className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          
- {filteredLoans.length > 0 && (
-            <div className={`px-6 py-4 border-t flex items-center justify-between ${
+      {/* Loans Table */}
+      <div className={`rounded-2xl border overflow-hidden shadow-sm mx-8 ${
+        isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className={`border-b ${
               isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
             }`}>
-              <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Showing <span className="font-semibold">{startIndex + 1}</span> to{' '}
-                <span className="font-semibold">{Math.min(endIndex, filteredLoans.length)}</span> of{' '}
-                <span className="font-semibold">{filteredLoans.length}</span> loans
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className={`p-2 border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isDarkMode 
-                      ? 'border-gray-600 hover:bg-gray-700' 
-                      : 'border-gray-300 hover:bg-white'
-                  }`}
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <span className={`px-4 py-2 text-sm font-medium ${
+              <tr>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
                   isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className={`p-2 border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isDarkMode 
-                      ? 'border-gray-600 hover:bg-gray-700' 
-                      : 'border-gray-300 hover:bg-white'
-                  }`}
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
+                }`}>Loan ID</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>Customer</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>Product</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>Principal</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>Total Payable</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>Outstanding</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>Tenure</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>Status</th>
+                <th className={`px-6 py-4 text-left text-xs font-semibold uppercase ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>Actions</th>
+              </tr>
+            </thead>
+            <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+              {currentLoans.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-16 text-center">
+                    <Wallet className={`w-16 h-16 mx-auto mb-4 ${
+                      isDarkMode ? 'text-gray-600' : 'text-gray-300'
+                    }`} />
+                    <p className={`text-lg mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      No loans found
+                    </p>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      {loans.length === 0 
+                        ? 'Click "Create Loan" to start' 
+                        : 'Try adjusting your search or filters'}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                currentLoans.map((loan: any) => (
+                  <tr key={loan._id} className={`transition-colors ${
+                    isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                  }`}>
+                    <td className="px-6 py-4">
+                      <span className={`text-sm font-bold ${
+                        isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                      }`}>{loan.loanId}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <span className={`text-sm font-semibold ${
+                          isDarkMode ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          {loan.customer?.firstName} {loan.customer?.lastName}
+                        </span>
+                        <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                          {loan.customer?.customerId}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getProductBadge(loan.loanProduct)}`}>
+                        {loan.loanProduct}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`text-sm font-semibold ${
+                        isDarkMode ? 'text-white' : 'text-gray-900'
+                      }`}>{formatCurrency(loan.principalAmount)}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm">
+                        <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {formatCurrency(loan.totalPayable)}
+                        </p>
+                        <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                          {loan.interestRate}% interest
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`text-sm font-semibold ${
+                        isDarkMode ? 'text-orange-400' : 'text-orange-600'
+                      }`}>
+                        {formatCurrency(loan.remainingBalance || 0)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-xs">
+                        <p className={`font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                          {loan.tenure} {loan.loanProduct === 'Monthly' ? 'months' : loan.loanProduct === 'Weekly' ? 'weeks' : 'days'}
+                        </p>
+                        {loan.startDate && (
+                          <p className={isDarkMode ? 'text-gray-500' : 'text-gray-600'}>
+                            {new Date(loan.startDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(loan.status)}`}>
+                        {getStatusIcon(loan.status)}
+                        {loan.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleView(loan)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            isDarkMode 
+                              ? 'text-blue-400 hover:bg-blue-900/30' 
+                              : 'text-blue-600 hover:bg-blue-50'
+                          }`}
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {loan.status?.toLowerCase() === 'pending' && (
+                          <>
+                            <button 
+                              onClick={() => handleApproveLoan(loan)}
+                              className={`p-2 rounded-lg transition-colors ${
+                                isDarkMode 
+                                  ? 'text-green-400 hover:bg-green-900/30' 
+                                  : 'text-green-600 hover:bg-green-50'
+                              }`}
+                              title="Approve Loan"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleRejectLoan(loan)}
+                              className={`p-2 rounded-lg transition-colors ${
+                                isDarkMode 
+                                  ? 'text-red-400 hover:bg-red-900/30' 
+                                  : 'text-red-600 hover:bg-red-50'
+                              }`}
+                              title="Reject Loan"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        {(loan.status === 'Approved' || loan.status?.toLowerCase() === 'approved') && (
+                          <button 
+                            onClick={() => handleDisburseLoan(loan)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isDarkMode 
+                                ? 'text-purple-400 hover:bg-purple-900/30' 
+                                : 'text-purple-600 hover:bg-purple-50'
+                            }`}
+                            title="Disburse Loan"
+                          >
+                            <DollarSign className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
+        
+        {filteredLoans.length > 0 && (
+          <div className={`px-6 py-4 border-t flex items-center justify-between ${
+            isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+          }`}>
+            <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Showing <span className="font-semibold">{startIndex + 1}</span> to{' '}
+              <span className="font-semibold">{Math.min(endIndex, filteredLoans.length)}</span> of{' '}
+              <span className="font-semibold">{filteredLoans.length}</span> loans
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`p-2 border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isDarkMode 
+                    ? 'border-gray-600 hover:bg-gray-700 text-gray-300' 
+                    : 'border-gray-300 hover:bg-white text-gray-700'
+                }`}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className={`px-4 py-2 text-sm font-medium ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`p-2 border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isDarkMode 
+                    ? 'border-gray-600 hover:bg-gray-700 text-gray-300' 
+                    : 'border-gray-300 hover:bg-white text-gray-700'
+                }`}
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Create Loan Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-2xl w-full max-w-5xl max-h-[100vh] flex flex-col shadow-2xl ${
+          <div className={`rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl ${
             isDarkMode ? 'bg-gray-800' : 'bg-white'
           }`}>
             <div className={`border-b px-6 py-4 flex items-center justify-between shrink-0 ${
@@ -1121,7 +1107,7 @@ useEffect(() => {
               <button 
                 onClick={() => { setShowCreateModal(false); resetForm(); }}
                 className={`p-2 rounded-lg transition-colors ${
-                  isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                  isDarkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600'
                 }`}
                 disabled={submitting}
               >
@@ -1137,30 +1123,36 @@ useEffect(() => {
                   isDarkMode ? 'text-white' : 'text-gray-900'
                 }`}>Step 1: Select Customer</h3>
                 {customers.length === 0 ? (
-                 <div className={`border rounded-lg p-4 text-center ${
-                  isDarkMode ? 'bg-yellow-900/30 border-yellow-700' : 'bg-yellow-50 border-yellow-200'
-                }`}>
-                  <AlertCircle className={`w-12 h-12 mx-auto mb-2 ${
-                    isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
-                  }`} />
-                  <p className="font-medium text-yellow-800">No approved customers available</p>
-                  <p className="font-medium text-yellow-800">Please approve customers first before creating loans</p>
-                </div>
+                  <div className={`rounded-lg p-4 text-center border ${
+                    isDarkMode ? 'bg-yellow-900/30 border-yellow-700' : 'bg-yellow-50 border-yellow-200'
+                  }`}>
+                    <AlertCircle className={`w-12 h-12 mx-auto mb-2 ${
+                      isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
+                    }`} />
+                    <p className={`font-medium ${isDarkMode ? 'text-yellow-300' : 'text-yellow-800'}`}>
+                      No approved customers available
+                    </p>
+                    <p className={`text-sm ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                      Please approve customers first before creating loans
+                    </p>
+                  </div>
                 ) : (
-                  <div className={`${isDarkMode ? 'space-y-3' : 'space-y-3'}`}>
+                  <div className="space-y-3">
                     {/* Search Field */}
                     <div className="relative">
-                      <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                      <Search className={`w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                        isDarkMode ? 'text-gray-500' : 'text-gray-400'
+                      }`} />
                       <input
                         type="text"
                         placeholder="Search by name, phone, or customer ID..."
                         value={customerSearchTerm}
                         onChange={(e) => setCustomerSearchTerm(e.target.value)}
                         disabled={submitting}
-                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
-                          isDarkMode
-                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                            : 'bg-white border-gray-300 text-gray-900'
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 text-sm ${
+                          isDarkMode 
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500' 
+                            : 'bg-white border-gray-300 placeholder-gray-400'
                         }`}
                       />
                     </div>
@@ -1171,7 +1163,11 @@ useEffect(() => {
                       value={formData.customerId}
                       onChange={handleInputChange}
                       disabled={submitting}
-                      className={`${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100`}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                        isDarkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white' 
+                          : 'bg-white border-gray-300 text-gray-900'
+                      }`}
                     >
                       <option value="">Choose a customer...</option>
                       {filteredCustomers.map((customer: any) => {
@@ -1186,7 +1182,7 @@ useEffect(() => {
                     </select>
 
                     {/* Results count */}
-                    <p className={`${isDarkMode ? 'text-xs text-gray-400' : 'text-xs text-gray-600'}`}>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>
                       Showing {filteredCustomers.length} of {customers.length} customers
                       {customerSearchTerm && ` (Filtered by "${customerSearchTerm}")`}
                     </p>
@@ -1197,24 +1193,28 @@ useEffect(() => {
               {selectedCustomer && (
                 <>
                   <div className={`rounded-lg p-4 border ${
-                    isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-blue-50 border-blue-200'
+                    isDarkMode ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-200'
                   }`}>
-                    <h4 className="font-semibold mb-2">Customer Loan Product</h4>
+                    <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      Customer Loan Product
+                    </h4>
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
                         <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Product</p>
-                      <p className="font-bold">{selectedCustomer.preferredLoanProduct}</p>
+                        <p className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {selectedCustomer.preferredLoanProduct}
+                        </p>
                       </div>
                       <div>
-                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Interest Rate</p>
-                        <p className="font-bold text-gray-900">
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Interest Rate</p>
+                        <p className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                           {selectedCustomer.preferredLoanProduct === 'Monthly' ? '25%' : 
                            selectedCustomer.preferredLoanProduct === 'Weekly' ? '27%' : '18%'}
                         </p>
                       </div>
                       <div>
-                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Max Tenure</p>
-                        <p className="font-bold text-gray-900">
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Max Tenure</p>
+                        <p className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                           {selectedCustomer.preferredLoanProduct === 'Monthly' ? '6 months' : 
                            selectedCustomer.preferredLoanProduct === 'Weekly' ? '24 weeks' : '20 days'}
                         </p>
@@ -1229,7 +1229,7 @@ useEffect(() => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className={`block text-sm font-medium mb-2 ${
-                          isDarkMode ? 'text-white' : 'text-gray-700'
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
                         }`}>
                           Principal Amount (₦) <span className="text-red-500">*</span>
                         </label>
@@ -1241,8 +1241,8 @@ useEffect(() => {
                           disabled={submitting}
                           className={`w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 ${
                             isDarkMode 
-                              ? 'bg-gray-700 border-gray-600 text-white' 
-                              : 'bg-white border-gray-300'
+                              ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500' 
+                              : 'bg-white border-gray-300 placeholder-gray-400'
                           }`}
                           placeholder="Enter amount"
                           min="0"
@@ -1251,7 +1251,7 @@ useEffect(() => {
 
                       <div>
                         <label className={`block text-sm font-medium mb-2 ${
-                          isDarkMode ? 'text-white' : 'text-gray-700'
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
                         }`}>
                           Tenure <span className="text-red-500">*</span>
                         </label>
@@ -1263,8 +1263,8 @@ useEffect(() => {
                           disabled={submitting}
                           className={`w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 ${
                             isDarkMode 
-                              ? 'bg-gray-700 border-gray-600 text-white' 
-                              : 'bg-white border-gray-300'
+                              ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500' 
+                              : 'bg-white border-gray-300 placeholder-gray-400'
                           }`}
                           placeholder={
                             selectedCustomer.preferredLoanProduct === 'Monthly' ? '1-6 months' :
@@ -1280,8 +1280,10 @@ useEffect(() => {
                       </div>
 
                       <div>
-                        <label className={`${isDarkMode ? 'block text-sm font-medium text-white mb-2' : 'block text-sm font-medium text-gray-700 mb-2'}`}>
-                          Start Date <span className={`${isDarkMode ? 'text-red-500' : 'text-red-500'}`}>*</span>
+                        <label className={`block text-sm font-medium mb-2 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Start Date <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="date"
@@ -1289,7 +1291,11 @@ useEffect(() => {
                           value={formData.startDate}
                           onChange={handleInputChange}
                           disabled={submitting}
-                          className={`${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100`}
+                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                            isDarkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white' 
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         />
                       </div>
                     </div>
@@ -1297,8 +1303,8 @@ useEffect(() => {
 
                   <div>
                     <label className={`block text-sm font-medium mb-2 ${
-                          isDarkMode ? 'text-white' : 'text-gray-700'
-                        }`}>
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
                       Loan Purpose <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -1307,50 +1313,86 @@ useEffect(() => {
                       onChange={handleInputChange}
                       disabled={submitting}
                       rows={3}
-                      className={`${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 placeholder-gray-400`}
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                        isDarkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500' 
+                          : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                      }`}
                       placeholder="Enter the purpose of this loan..."
                     />
                   </div>
 
                   {loanCalculation && (
-                    <div className={`${isDarkMode ? 'bg-green-900 border-2 border-green-700' : 'bg-green-50 border-2 border-green-200'} rounded-lg p-6`}>
-                      <h3 className={`text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                        <DollarSign className="w-5 h-5 text-green-600" />
+                    <div className={`rounded-lg p-6 border-2 ${
+                      isDarkMode ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200'
+                    }`}>
+                      <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${
+                        isDarkMode ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        <DollarSign className={`w-5 h-5 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`} />
                         Loan Calculation Summary
                       </h3>
-                      <div className={`${isDarkMode ? 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4' : 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4'}`}>
-                        <div className="bg-white rounded-lg p-4 border border-green-200">
-                          <p className="text-xs text-gray-600 mb-1">Principal</p>
-                          <p className="text-lg font-bold text-gray-900">{formatCurrency(loanCalculation.principal)}</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div className={`rounded-lg p-4 border ${
+                          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-green-200'
+                        }`}>
+                          <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            Principal
+                          </p>
+                          <p className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {formatCurrency(loanCalculation.principal)}
+                          </p>
                         </div>
-                        <div className="bg-white rounded-lg p-4 border border-green-200">
-                          <p className="text-xs text-gray-600 mb-1">Interest ({loanCalculation.interestRate}%)</p>
-                          <p className="text-lg font-bold text-orange-600">{formatCurrency(loanCalculation.interest)}</p>
+                        <div className={`rounded-lg p-4 border ${
+                          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-green-200'
+                        }`}>
+                          <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            Interest ({loanCalculation.interestRate}%)
+                          </p>
+                          <p className={`text-lg font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
+                            {formatCurrency(loanCalculation.interest)}
+                          </p>
                         </div>
-                        <div className="bg-white rounded-lg p-4 border border-green-200">
-                          <p className="text-xs text-gray-600 mb-1">Total Payable</p>
-                          <p className="text-lg font-bold text-blue-600">{formatCurrency(loanCalculation.totalPayable)}</p>
+                        <div className={`rounded-lg p-4 border ${
+                          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-green-200'
+                        }`}>
+                          <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            Total Payable
+                          </p>
+                          <p className={`text-lg font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                            {formatCurrency(loanCalculation.totalPayable)}
+                          </p>
                         </div>
-                        <div className="bg-white rounded-lg p-4 border border-green-200">
-                          <p className="text-xs text-gray-600 mb-1">{loanCalculation.installmentLabel}</p>
-                          <p className="text-lg font-bold text-green-600">
+                        <div className={`rounded-lg p-4 border ${
+                          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-green-200'
+                        }`}>
+                          <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {loanCalculation.installmentLabel}
+                          </p>
+                          <p className={`text-lg font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
                             {formatCurrency(loanCalculation.installmentAmount)}
                           </p>
                         </div>
                       </div>
                       
                       {loanCalculation.endDate && (
-                        <div className="bg-white rounded-lg p-4 border border-green-200">
+                        <div className={`rounded-lg p-4 border ${
+                          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-green-200'
+                        }`}>
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-xs text-gray-600 mb-1">Loan Period</p>
-                              <p className="text-sm font-semibold text-gray-900">
+                              <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                Loan Period
+                              </p>
+                              <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                                 {formData.startDate} to {loanCalculation.endDate}
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="text-xs text-gray-600 mb-1">Duration</p>
-                              <p className="text-sm font-semibold text-gray-900">
+                              <p className={`text-xs mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                Duration
+                              </p>
+                              <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                                 {loanCalculation.tenure} {loanCalculation.tenureLabel}
                               </p>
                             </div>
@@ -1360,18 +1402,24 @@ useEffect(() => {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                  <div className={`flex items-center justify-end gap-3 pt-4 border-t ${
+                    isDarkMode ? 'border-gray-700' : 'border-gray-200'
+                  }`}>
                     <button
                       onClick={() => { setShowCreateModal(false); resetForm(); }}
                       disabled={submitting}
-                      className="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:text-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`px-6 py-2 border rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isDarkMode 
+                          ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleSubmit}
                       disabled={submitting}
-                      className="flex items-center gap-2 px-4 py-2 bg-lime-500 text-white shadow-lg shadow-lime-600/50 rounded-lg font-semibold hover:bg-lime-600 shadow-md transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 bg-lime-500 text-white shadow-lg shadow-lime-600/50 rounded-lg font-semibold hover:bg-lime-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {submitting ? (
                         <>
@@ -1392,65 +1440,181 @@ useEffect(() => {
 
       {/* View Loan Modal */}
       {showViewModal && selectedLoan && (
-        <div className={`${isDarkMode ? 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4' : 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'}`}>
-          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto`}>
-            <div className={`${isDarkMode ? 'sticky top-0 bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between z-10' : 'sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10'}`}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto ${
+            isDarkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            <div className={`sticky top-0 border-b px-6 py-4 flex items-center justify-between z-10 ${
+              isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
               <div>
-                <h2 className={`${isDarkMode ? 'text-xl font-bold text-white' : 'text-xl font-bold text-gray-900'}`}>Loan Details</h2>
-                <p className="text-sm text-white mt-1">{selectedLoan.loanId}</p>
+                <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Loan Details
+                </h2>
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  {selectedLoan.loanId}
+                </p>
               </div>
               <button 
                 onClick={() => setShowViewModal(false)}
-                className={`${isDarkMode ? 'p-2 hover:bg-lime-500 text-white rounded-lg transition-colors' : 'p-2 hover:bg-gray-100 rounded-lg transition-colors'}`}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600'
+                }`}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
-              <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
-                <h3 className={`${isDarkMode ? 'font-semibold text-white mb-3' : 'font-semibold text-gray-900 mb-3'}`}>Customer Information</h3>
+              <div className={`rounded-lg p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Customer Information
+                </h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Name:</span> <span className={`${isDarkMode ? 'font-medium' : 'font-medium'}`}>{selectedLoan.customer?.firstName} {selectedLoan.customer?.lastName}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Customer ID:</span> <span className="font-medium">{selectedLoan.customer?.customerId}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Phone:</span> <span className="font-medium">{selectedLoan.customer?.phoneNumber}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Type:</span> <span className="font-medium">{selectedLoan.customer?.customerType}</span></div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Name:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedLoan.customer?.firstName} {selectedLoan.customer?.lastName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Customer ID:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedLoan.customer?.customerId}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Phone:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedLoan.customer?.phoneNumber}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Type:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedLoan.customer?.customerType}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
-                <h3 className={`${isDarkMode ? 'font-semibold text-white mb-3' : 'font-semibold text-gray-900 mb-3'}`}>Loan Details</h3>
+              <div className={`rounded-lg p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Loan Details
+                </h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Product:</span> <span className="font-medium">{selectedLoan.loanProduct}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Interest Rate:</span> <span className="font-medium">{selectedLoan.interestRate}%</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Principal:</span> <span className="font-medium">{formatCurrency(selectedLoan.principalAmount)}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Interest:</span> <span className="font-medium">{formatCurrency(selectedLoan.interestAmount)}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Payable:</span> <span className="font-medium">{formatCurrency(selectedLoan.totalAmount)}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Installment:</span> <span className="font-medium">{formatCurrency(selectedLoan.installmentAmount)}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Tenure:</span> <span className="font-medium">{selectedLoan.tenure} {selectedLoan.loanProduct === 'Monthly' ? 'months' : selectedLoan.loanProduct === 'Weekly' ? 'weeks' : 'days'}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Status:</span> <span className={`font-semibold ${selectedLoan.status?.toLowerCase() === 'active' || selectedLoan.status?.toLowerCase() === 'disbursed' ? 'text-green-600' : selectedLoan.status?.toLowerCase() === 'pending' ? 'text-yellow-600' : selectedLoan.status?.toLowerCase() === 'completed' ? 'text-gray-600' : 'text-red-600'}`}>{selectedLoan.status}</span></div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Product:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedLoan.loanProduct}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Interest Rate:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedLoan.interestRate}%
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Principal:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {formatCurrency(selectedLoan.principalAmount)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Interest:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {formatCurrency(selectedLoan.interestAmount)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Total Payable:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {formatCurrency(selectedLoan.totalAmount)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Installment:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {formatCurrency(selectedLoan.installmentAmount)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Tenure:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedLoan.tenure} {selectedLoan.loanProduct === 'Monthly' ? 'months' : selectedLoan.loanProduct === 'Weekly' ? 'weeks' : 'days'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Status:</span>{' '}
+                    <span className={`font-semibold ${
+                      selectedLoan.status?.toLowerCase() === 'active' || selectedLoan.status?.toLowerCase() === 'disbursed' 
+                        ? isDarkMode ? 'text-green-400' : 'text-green-600'
+                        : selectedLoan.status?.toLowerCase() === 'pending' 
+                          ? isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
+                          : selectedLoan.status?.toLowerCase() === 'completed' 
+                            ? isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                            : isDarkMode ? 'text-red-400' : 'text-red-600'
+                    }`}>
+                      {selectedLoan.status}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
-                <h3 className={`${isDarkMode ? 'font-semibold text-white mb-3' : 'font-semibold text-gray-900 mb-3'}`}>Payment Information</h3>
+              <div className={`rounded-lg p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Payment Information
+                </h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Amount Paid:</span> <span className="font-medium text-green-600">{formatCurrency(selectedLoan.amountPaid || 0)}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Outstanding:</span> <span className="font-medium text-orange-600">{formatCurrency(selectedLoan.outstandingBalance || 0)}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Start Date:</span> <span className="font-medium">{selectedLoan.startDate ? new Date(selectedLoan.startDate).toLocaleDateString() : 'N/A'}</span></div>
-                  <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>End Date:</span> <span className="font-medium">{selectedLoan.endDate ? new Date(selectedLoan.endDate).toLocaleDateString() : 'N/A'}</span></div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Amount Paid:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                      {formatCurrency(selectedLoan.amountPaid || 0)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Outstanding:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
+                      {formatCurrency(selectedLoan.outstandingBalance || 0)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Start Date:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedLoan.startDate ? new Date(selectedLoan.startDate).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>End Date:</span>{' '}
+                    <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedLoan.endDate ? new Date(selectedLoan.endDate).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
                   {selectedLoan.disbursedDate && (
-                    <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Disbursed:</span> <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{new Date(selectedLoan.disbursedDate).toLocaleDateString()}</span></div>
+                    <div>
+                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Disbursed:</span>{' '}
+                      <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {new Date(selectedLoan.disbursedDate).toLocaleDateString()}
+                      </span>
+                    </div>
                   )}
                   {selectedLoan.approvedDate && (
-                    <div><span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Approved:</span> <span className="font-medium">{new Date(selectedLoan.approvedDate).toLocaleDateString()}</span></div>
+                    <div>
+                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Approved:</span>{' '}
+                      <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {new Date(selectedLoan.approvedDate).toLocaleDateString()}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-4">
-                <p className={`${isDarkMode ? 'text-white' : 'text-gray-600'}`}>
-                  <span className={`font-medium ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>Created:</span> {new Date(selectedLoan.createdAt).toLocaleDateString()} at {new Date(selectedLoan.createdAt).toLocaleTimeString()}
+              <div className={`border-t pt-4 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <span className="font-medium">Created:</span>{' '}
+                  {new Date(selectedLoan.createdAt).toLocaleDateString()} at{' '}
+                  {new Date(selectedLoan.createdAt).toLocaleTimeString()}
                 </p>
               </div>
             </div>
