@@ -8,6 +8,7 @@ import {
   X, Loader2, UserCheck, XCircle, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
+import Swal from 'sweetalert2';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 // const API_URL = 'http://localhost:5000/api';
@@ -451,53 +452,73 @@ export default function LoansPage() {
   };
 
   const handleApproveLoan = async (loan: any) => {
-    if (!confirm(`Approve loan ${loan.loanId} for ${loan.customer?.firstName} ${loan.customer?.lastName}?`)) {
-      return;
-    }
+    const result = await Swal.fire({
+      title: 'Approve Loan?',
+      text: `Approve loan ${loan.loanId} for ${loan.customer?.firstName} ${loan.customer?.lastName}?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, approve',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#16a34a',
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       await loanService.approveLoan(loan._id);
       await fetchLoans();
-      toast.success('✅ Loan approved successfully!');
+
+      Swal.fire({
+        title: 'Approved!',
+        text: 'Loan approved successfully.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (err: any) {
-      toast.error('❌ Failed to approve: ' + err.message);
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to approve: ' + err.message,
+        icon: 'error',
+      });
     }
   };
 
-  const handleDisburseLoan = async (loan: any) => {
-    if (!confirm(`Disburse ${formatCurrency(loan.principalAmount)} to ${loan.customer?.firstName} ${loan.customer?.lastName}?`)) {
-      return;
-    }
+
+    const handleDisburseLoan = async (loan: any) => {
+    const result = await Swal.fire({
+      title: 'Disburse Loan?',
+      text: `Disburse ${formatCurrency(loan.principalAmount)} to ${loan.customer?.firstName} ${loan.customer?.lastName}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, disburse',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#2563eb',
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       await loanService.disburseLoan(loan._id);
       await fetchLoans();
-      toast.success('✅ Loan disbursed successfully!');
+
+      Swal.fire({
+        title: 'Disbursed!',
+        text: 'Loan disbursed successfully.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (err: any) {
-      toast.error('❌ Failed to disburse: ' + err.message);
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to disburse: ' + err.message,
+        icon: 'error',
+      });
     }
   };
 
-  const handleRejectLoan = async (loan: any) => {
-    if (!confirm(`Reject loan ${loan.loanId}? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      await loanService.rejectLoan(loan._id);
-      await fetchLoans();
-      toast.success('✅ Loan rejected!');
-    } catch (err: any) {
-      toast.error('❌ Failed to reject: ' + err.message);
-    }
-  };
-
-  const handleView = (loan: any) => {
-    setSelectedLoan(loan);
-    setShowViewModal(true);
-  };
-
-  const resetForm = () => {
+    const resetForm = () => {
     setFormData({
       customerId: '',
       principal: '',
@@ -505,7 +526,37 @@ export default function LoansPage() {
       startDate: '',
       purpose: ''
     });
-    setCustomerSearchTerm('');
+    const handleRejectLoan = async (loan: any) => {
+    const result = await Swal.fire({
+      title: 'Reject Loan?',
+      text: `Reject loan ${loan.loanId}? This action cannot be undone.`,
+      icon: 'error',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, reject',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#dc2626',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await loanService.rejectLoan(loan._id);
+      await fetchLoans();
+
+      Swal.fire({
+        title: 'Rejected!',
+        text: 'Loan rejected successfully.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (err: any) {
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to reject: ' + err.message,
+        icon: 'error',
+      });
+    }
   };
 
   const exportToCSV = () => {
