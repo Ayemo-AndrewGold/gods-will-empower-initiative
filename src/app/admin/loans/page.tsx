@@ -719,7 +719,7 @@ export default function LoansPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 px-8 pt-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6 mb-6">
         <div className={`rounded-2xl p-6 border shadow-sm relative overflow-hidden ${
             isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
           }`}>
