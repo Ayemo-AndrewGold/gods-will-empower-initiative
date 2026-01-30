@@ -5,7 +5,8 @@ import { Bell, Moon, Search, Sun, X, User, LogOut, Settings, ChevronDown, Users,
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 
-const API_URL = 'http://localhost:5000/api';
+// const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // API Services
 const authService = {
