@@ -10,8 +10,8 @@ import {
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 // const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // API Service
 const loanService = {
@@ -341,17 +341,6 @@ export default function LoansPage() {
 
   const loanCalculation = calculateLoanDetails();
 
-  const resetForm = () => {
-    setFormData({
-      customerId: '',
-      principal: '',
-      tenure: '',
-      startDate: '',
-      purpose: ''
-    });
-    setCustomerSearchTerm('');
-  };
-
   const handleInputChange = (e: any) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -470,102 +459,95 @@ export default function LoansPage() {
       showCancelButton: true,
       confirmButtonText: 'Yes, approve',
       cancelButtonText: 'Cancel',
-      confirmButtonColor: '#16a34a',
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
     });
 
-    if (!result.isConfirmed) return;
+    if (!result.isConfirmed) {
+      return;
+    }
 
     try {
       await loanService.approveLoan(loan._id);
       await fetchLoans();
-
-      Swal.fire({
-        title: 'Approved!',
-        text: 'Loan approved successfully.',
-        icon: 'success',
-        timer: 2000,
-        showConfirmButton: false,
-      });
+      toast.success('✅ Loan approved successfully!');
     } catch (err: any) {
-      Swal.fire({
-        title: 'Error!',
-        text: 'Failed to approve: ' + err.message,
-        icon: 'error',
-      });
+      toast.error('❌ Failed to approve: ' + err.message);
     }
   };
 
-
-    const handleDisburseLoan = async (loan: any) => {
+  const handleDisburseLoan = async (loan: any) => {
     const result = await Swal.fire({
       title: 'Disburse Loan?',
       text: `Disburse ${formatCurrency(loan.principalAmount)} to ${loan.customer?.firstName} ${loan.customer?.lastName}?`,
-      icon: 'warning',
+      icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Yes, disburse',
       cancelButtonText: 'Cancel',
-      confirmButtonColor: '#2563eb',
+      confirmButtonColor: '#8b5cf6',
+      cancelButtonColor: '#6b7280',
     });
 
-    if (!result.isConfirmed) return;
+    if (!result.isConfirmed) {
+      return;
+    }
 
     try {
       await loanService.disburseLoan(loan._id);
       await fetchLoans();
-
-      Swal.fire({
-        title: 'Disbursed!',
-        text: 'Loan disbursed successfully.',
-        icon: 'success',
-        timer: 2000,
-        showConfirmButton: false,
-      });
+      toast.success('✅ Loan disbursed successfully!');
     } catch (err: any) {
-      Swal.fire({
-        title: 'Error!',
-        text: 'Failed to disburse: ' + err.message,
-        icon: 'error',
-      });
+      toast.error('❌ Failed to disburse: ' + err.message);
     }
   };
 
-  
   const handleRejectLoan = async (loan: any) => {
     const result = await Swal.fire({
       title: 'Reject Loan?',
-      text: `Reject loan ${loan.loanId}? This action cannot be undone.`,
-      icon: 'error',
+      text: `Are you sure you want to reject loan ${loan.loanId}?`,
+      input: 'textarea',
+      inputLabel: 'Rejection Reason',
+      inputPlaceholder: 'Enter reason for rejection...',
+      inputAttributes: {
+        'aria-label': 'Enter reason for rejection'
+      },
+      inputValidator: (value) => {
+        if (!value) {
+          return 'You need to provide a reason for rejection!';
+        }
+      },
       showCancelButton: true,
       confirmButtonText: 'Yes, reject',
       cancelButtonText: 'Cancel',
-      confirmButtonColor: '#dc2626',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
     });
 
-    if (!result.isConfirmed) return;
-
-    try {
-      await loanService.rejectLoan(loan._id);
-      await fetchLoans();
-
-      Swal.fire({
-        title: 'Rejected!',
-        text: 'Loan rejected successfully.',
-        icon: 'success',
-        timer: 2000,
-        showConfirmButton: false,
-      });
-    } catch (err: any) {
-      Swal.fire({
-        title: 'Error!',
-        text: 'Failed to reject: ' + err.message,
-        icon: 'error',
-      });
+    if (result.isConfirmed && result.value) {
+      try {
+        await loanService.rejectLoan(loan._id);
+        await fetchLoans();
+        toast.success('✅ Loan rejected!');
+      } catch (err: any) {
+        toast.error('❌ Failed to reject: ' + err.message);
+      }
     }
   };
 
   const handleView = (loan: any) => {
     setSelectedLoan(loan);
     setShowViewModal(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      customerId: '',
+      principal: '',
+      tenure: '',
+      startDate: '',
+      purpose: ''
+    });
+    setCustomerSearchTerm('');
   };
 
   const exportToCSV = () => {
