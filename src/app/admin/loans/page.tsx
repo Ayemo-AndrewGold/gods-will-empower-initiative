@@ -341,6 +341,17 @@ export default function LoansPage() {
 
   const loanCalculation = calculateLoanDetails();
 
+  const resetForm = () => {
+    setFormData({
+      customerId: '',
+      principal: '',
+      tenure: '',
+      startDate: '',
+      purpose: ''
+    });
+    setCustomerSearchTerm('');
+  };
+
   const handleInputChange = (e: any) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -518,15 +529,8 @@ export default function LoansPage() {
     }
   };
 
-    const resetForm = () => {
-    setFormData({
-      customerId: '',
-      principal: '',
-      tenure: '',
-      startDate: '',
-      purpose: ''
-    });
-    const handleRejectLoan = async (loan: any) => {
+  
+  const handleRejectLoan = async (loan: any) => {
     const result = await Swal.fire({
       title: 'Reject Loan?',
       text: `Reject loan ${loan.loanId}? This action cannot be undone.`,
@@ -557,6 +561,11 @@ export default function LoansPage() {
         icon: 'error',
       });
     }
+  };
+
+  const handleView = (loan: any) => {
+    setSelectedLoan(loan);
+    setShowViewModal(true);
   };
 
   const exportToCSV = () => {
