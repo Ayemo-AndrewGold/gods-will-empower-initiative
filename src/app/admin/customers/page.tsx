@@ -1301,17 +1301,490 @@ export default function CustomersPage() {
 
       {/* View Modal */}
       {showViewModal && selectedCustomer && (
-        <div className={`${isDarkMode ? 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4' : 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'}`}>
-          <div className={`${isDarkMode ? 'bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto' : 'bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto'}`}>
-            <div className={`${isDarkMode ? 'sticky top-0 bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between z-10' : 'sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10'}`}>
-              <div><h2 className={`${isDarkMode ? 'text-xl font-bold text-gray-100' : 'text-xl font-bold text-gray-900'}`}>Customer Details</h2><p className="text-sm text-gray-600 mt-1">{selectedCustomer.customerId}</p></div>
-              <button onClick={() => setShowViewModal(false)} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl ${
+            isDarkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            {/* Header */}
+            <div className={`border-b px-6 py-4 flex items-center justify-between shrink-0 ${
+              isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
+              <div>
+                <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Customer Details
+                </h2>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className={`text-sm font-mono ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                    {selectedCustomer.customerId}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(selectedCustomer.status)}`}>
+                    {selectedCustomer.status}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getProductBadge(selectedCustomer.preferredLoanProduct)}`}>
+                    {selectedCustomer.preferredLoanProduct}
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowViewModal(false)} 
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="p-6 space-y-6">
-              <div className={`${isDarkMode ? 'bg-gray-700 rounded-lg p-4' : 'bg-gray-50 rounded-lg p-4'}`}><h3 className={`${isDarkMode ? 'font-semibold text-gray-100 mb-3' : 'font-semibold text-gray-900 mb-3'}`}>Basic Information</h3><div className="grid grid-cols-2 gap-4 text-sm"><div><span className="text-gray-600">Name:</span> <span className="font-medium">{selectedCustomer.firstName} {selectedCustomer.lastName}</span></div><div><span className="text-gray-600">Phone:</span> <span className="font-medium">{selectedCustomer.phoneNumber}</span></div>{selectedCustomer.email && <div><span className="text-gray-600">Email:</span> <span className="font-medium">{selectedCustomer.email}</span></div>}<div><span className="text-gray-600">Address:</span> <span className="font-medium">{selectedCustomer.address}</span></div></div></div>
-              {selectedCustomer.customerType === 'Group' && selectedCustomer.groupMembers && selectedCustomer.groupMembers.length > 0 && (
-                <div className={`${isDarkMode ? 'bg-purple-900 rounded-lg p-4' : 'bg-purple-50 rounded-lg p-4'}`}><h3 className={`${isDarkMode ? 'font-semibold text-gray-100 mb-3' : 'font-semibold text-gray-900 mb-3'}`}>Group Members ({selectedCustomer.groupMembers.length})</h3><div className="space-y-2">{selectedCustomer.groupMembers.map((member: any, idx: number) => (<div key={idx} className={`${isDarkMode ? 'bg-gray-700 rounded p-2' : 'bg-white rounded p-2'}`}><p className={`${isDarkMode ? 'font-medium text-gray-100' : 'font-medium text-gray-900'}`}>{member.name}</p><p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{member.phoneNumber} • {member.relationship}</p></div>))}</div></div>
+
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto flex-1 p-6 space-y-6">
+              
+              {/* Rejection Reason Alert (if rejected) */}
+              {selectedCustomer.status === 'Rejected' && selectedCustomer.rejectionReason && (
+                <div className={`rounded-lg p-4 border-l-4 ${
+                  isDarkMode 
+                    ? 'bg-red-900/30 border-red-500 text-red-300' 
+                    : 'bg-red-50 border-red-500 text-red-800'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="font-semibold mb-1">Rejection Reason:</h4>
+                      <p className="text-sm">{selectedCustomer.rejectionReason}</p>
+                      {selectedCustomer.rejectedAt && (
+                        <p className="text-xs mt-2 opacity-75">
+                          Rejected on {new Date(selectedCustomer.rejectedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
+
+              {/* Basic Information */}
+              <div className={`rounded-xl p-5 border ${
+                isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <h3 className={`font-semibold text-lg mb-4 flex items-center gap-2 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  <Users className="w-5 h-5" />
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Full Name
+                    </p>
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {selectedCustomer.firstName} {selectedCustomer.lastName}
+                    </p>
+                  </div>
+                  <div>
+                    <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Phone Number
+                    </p>
+                    <p className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      <Phone className="w-4 h-4" />
+                      {selectedCustomer.phoneNumber}
+                    </p>
+                  </div>
+                  {selectedCustomer.email && (
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Email Address
+                      </p>
+                      <p className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        <Mail className="w-4 h-4" />
+                        {selectedCustomer.email}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Address
+                    </p>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {selectedCustomer.address}
+                    </p>
+                  </div>
+                  {selectedCustomer.dateOfBirth && (
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Date of Birth
+                      </p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {new Date(selectedCustomer.dateOfBirth).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                  {selectedCustomer.gender && (
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Gender
+                      </p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {selectedCustomer.gender}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Customer Type
+                    </p>
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                      selectedCustomer.customerType === 'Group' 
+                        ? 'bg-purple-100 text-purple-700' 
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {selectedCustomer.customerType}
+                    </span>
+                  </div>
+                  {selectedCustomer.groupName && (
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Group Name
+                      </p>
+                      <p className={`text-sm font-semibold ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                        {selectedCustomer.groupName}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Identification */}
+              {(selectedCustomer.idType || selectedCustomer.idNumber) && (
+                <div className={`rounded-xl p-5 border ${
+                  isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <h3 className={`font-semibold text-lg mb-4 flex items-center gap-2 ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    <CreditCard className="w-5 h-5" />
+                    Identification
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedCustomer.idType && (
+                      <div>
+                        <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          ID Type
+                        </p>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {selectedCustomer.idType}
+                        </p>
+                      </div>
+                    )}
+                    {selectedCustomer.idNumber && (
+                      <div>
+                        <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          ID Number
+                        </p>
+                        <p className={`text-sm font-mono ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {selectedCustomer.idNumber}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Business Information */}
+              {(selectedCustomer.businessName || selectedCustomer.businessType || selectedCustomer.businessAddress) && (
+                <div className={`rounded-xl p-5 border ${
+                  isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <h3 className={`font-semibold text-lg mb-4 flex items-center gap-2 ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    <Briefcase className="w-5 h-5" />
+                    Business Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedCustomer.businessName && (
+                      <div>
+                        <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Business Name
+                        </p>
+                        <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {selectedCustomer.businessName}
+                        </p>
+                      </div>
+                    )}
+                    {selectedCustomer.businessType && (
+                      <div>
+                        <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Business Type
+                        </p>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {selectedCustomer.businessType}
+                        </p>
+                      </div>
+                    )}
+                    {selectedCustomer.businessAddress && (
+                      <div className="md:col-span-2">
+                        <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Business Address
+                        </p>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {selectedCustomer.businessAddress}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Next of Kin */}
+              {selectedCustomer.nextOfKin && (
+                <div className={`rounded-xl p-5 border ${
+                  isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <h3 className={`font-semibold text-lg mb-4 flex items-center gap-2 ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    <UserCheck className="w-5 h-5" />
+                    Next of Kin
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Full Name
+                      </p>
+                      <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {selectedCustomer.nextOfKin.name}
+                      </p>
+                    </div>
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Relationship
+                      </p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {selectedCustomer.nextOfKin.relationship}
+                      </p>
+                    </div>
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Phone Number
+                      </p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {selectedCustomer.nextOfKin.phoneNumber}
+                      </p>
+                    </div>
+                    {selectedCustomer.nextOfKin.address && (
+                      <div>
+                        <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Address
+                        </p>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {selectedCustomer.nextOfKin.address}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Group Information */}
+              {selectedCustomer.customerType === 'Group' && (
+                <>
+                  {/* Union Leader */}
+                  {selectedCustomer.unionLeader && (
+                    <div className={`rounded-xl p-5 border ${
+                      isDarkMode ? 'bg-purple-900/30 border-purple-700' : 'bg-purple-50 border-purple-200'
+                    }`}>
+                      <h3 className={`font-semibold text-lg mb-4 ${
+                        isDarkMode ? 'text-purple-300' : 'text-purple-900'
+                      }`}>
+                        👤 Union Leader
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                            Name
+                          </p>
+                          <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {selectedCustomer.unionLeader.name}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                            Phone
+                          </p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {selectedCustomer.unionLeader.phoneNumber}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                            Address
+                          </p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {selectedCustomer.unionLeader.address}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Union Secretary (for Weekly loans) */}
+                  {selectedCustomer.unionSecretary && selectedCustomer.unionSecretary.name && (
+                    <div className={`rounded-xl p-5 border ${
+                      isDarkMode ? 'bg-purple-900/30 border-purple-700' : 'bg-purple-50 border-purple-200'
+                    }`}>
+                      <h3 className={`font-semibold text-lg mb-4 ${
+                        isDarkMode ? 'text-purple-300' : 'text-purple-900'
+                      }`}>
+                        📝 Union Secretary
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                            Name
+                          </p>
+                          <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {selectedCustomer.unionSecretary.name}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                            Phone
+                          </p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {selectedCustomer.unionSecretary.phoneNumber}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                            Address
+                          </p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {selectedCustomer.unionSecretary.address}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Group Members */}
+                  {selectedCustomer.groupMembers && selectedCustomer.groupMembers.length > 0 && (
+                    <div className={`rounded-xl p-5 border ${
+                      isDarkMode ? 'bg-green-900/30 border-green-700' : 'bg-green-50 border-green-200'
+                    }`}>
+                      <h3 className={`font-semibold text-lg mb-4 ${
+                        isDarkMode ? 'text-green-300' : 'text-green-900'
+                      }`}>
+                        👥 Group Members ({selectedCustomer.groupMembers.length})
+                      </h3>
+                      <div className="space-y-3">
+                        {selectedCustomer.groupMembers.map((member: any, idx: number) => (
+                          <div key={idx} className={`rounded-lg p-3 border ${
+                            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-green-200'
+                          }`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className={`font-semibold text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  {idx + 1}. {member.name}
+                                </p>
+                                <div className={`flex items-center gap-4 mt-1 text-xs ${
+                                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                                }`}>
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="w-3 h-3" />
+                                    {member.phoneNumber}
+                                  </span>
+                                  <span>• {member.relationship}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Notes */}
+              {selectedCustomer.notes && (
+                <div className={`rounded-xl p-5 border ${
+                  isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <h3 className={`font-semibold text-lg mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    📝 Notes
+                  </h3>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} whitespace-pre-wrap`}>
+                    {selectedCustomer.notes}
+                  </p>
+                </div>
+              )}
+
+              {/* Metadata */}
+              <div className={`rounded-xl p-5 border ${
+                isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <h3 className={`font-semibold text-lg mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  System Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Created On
+                    </p>
+                    <p className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                      {new Date(selectedCustomer.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  {selectedCustomer.approvedAt && (
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Approved On
+                      </p>
+                      <p className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                        {new Date(selectedCustomer.approvedAt).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                  {selectedCustomer.createdBy && (
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Created By
+                      </p>
+                      <p className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                        {selectedCustomer.createdBy.firstName} {selectedCustomer.createdBy.lastName}
+                        {selectedCustomer.createdBy.staffId && ` (${selectedCustomer.createdBy.staffId})`}
+                      </p>
+                    </div>
+                  )}
+                  {selectedCustomer.approvedBy && (
+                    <div>
+                      <p className={`text-xs font-medium mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Approved By
+                      </p>
+                      <p className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                        {selectedCustomer.approvedBy.firstName} {selectedCustomer.approvedBy.lastName}
+                        {selectedCustomer.approvedBy.staffId && ` (${selectedCustomer.approvedBy.staffId})`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className={`border-t px-6 py-4 flex items-center justify-end gap-3 shrink-0 ${
+              isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
+              <button 
+                onClick={() => setShowViewModal(false)} 
+                className={`px-6 py-2 border rounded-lg font-medium transition-colors ${
+                  isDarkMode 
+                    ? 'border-gray-600 hover:bg-gray-700 text-gray-300' 
+                    : 'border-gray-300 hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
